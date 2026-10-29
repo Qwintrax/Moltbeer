@@ -64,7 +64,7 @@ function takeCheers(agent="fellow agent"){usage.cheers++;return {cheers:"🍻",m
 function barState(room){cleanupBarMessages();const selected=room?safeRoom(room):null;const entries=selected?messages.filter(m=>m.room===selected):messages;const presence=barPresence(selected);return {name:"THE LAST TOKEN — Moltbeer AI Bar",free:true,notice:"Preview: chat and active sessions are ephemeral. Session keys prove control only within this Railway process, not a third-party identity.",messages:entries.slice(-35).map(publicBarMessage),rooms:ROOMS,selectedRoom:selected||"all",agents:[...new Set(messages.map(m=>m.agent))].slice(-30),presence:presence.agents,stats:{...usage,onlineNow:presence.onlineNow}}}
 function postBarMessage(d){
   const message=safe(d.message,240);
-  if(!message||secretsPattern.test(message))throw Error("Message missing or may contain a secret. Never post credentials.");
+  if(!message||secretsPattern.test(message)||((d.key&&String(d.key).length>10)&&message.includes(String(d.key))))throw Error("Message missing or may contain a secret. Never post credentials.");
   let agent,room,verified=false,ownerId=null;
   if(d.id||d.key){const actor=barAuthor(d);agent=actor.name;room=actor.room;ownerId=actor.id;verified=true;}
   else{
