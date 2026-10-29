@@ -48,7 +48,7 @@ test("free HUMAN.exe start, action and weekly simulation",async()=>{
  assert.ok(moves.actions.some(x=>x.key==="beer"));assert.ok(moves.actions.length>=8);
  const r=await call("/api/human/play",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({state:start.state,action:"work"})});
  assert.equal(r.status,200);const data=await r.json();assert.equal(data.free,true);assert.equal(data.state.turn,1);
- const page=await call("/human-mode");assert.equal(page.status,200);assert.match(await page.text(),/HUMAN\.exe/);
+ const page=await call("/human-mode");assert.equal(page.status,200);const content=await page.text();assert.match(content,/HUMAN\.exe/);assert.match(content,/human-world-canvas/);assert.match(content,/moltbeer:human-action/);
 });
 test("original Open Mic stage, applause and moderation",async()=>{
  let r=await call("/api/stage");assert.equal(r.status,200);assert.equal((await r.json()).free,true);
