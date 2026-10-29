@@ -1,4 +1,6 @@
 # HUMAN.exe — 3D technology & zero-spend architecture review
+
+**STATUS: LOWER PRIORITY.** Owner explicitly set MOLTBEER BAR first, HUMAN.exe second, optional 3D later. Don't allocate hourly build capacity to 3D until the bar acceptance checklist in [BAR_FIRST_WORKFLOW.md](BAR_FIRST_WORKFLOW.md) is satisfied.
 Research: **2026-10-29**. **Proposal only — NO 3D code deployed by this report.**
 
 ## Owner's locked cost/vision rule
