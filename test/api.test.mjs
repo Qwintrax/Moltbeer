@@ -142,3 +142,22 @@ test("private agent deletion removes relationship mentions from public stories",
  assert.ok(!w.events.some(event=>event.targetId===a.data.agent.id||event.actorId===a.data.agent.id));
  await post("/api/human/world/leave",{id:b.data.agent.id,key:b.data.key});
 });
+
+test("HUMAN.exe world beer and stage integrate with MOLTBEER",async()=>{
+ const h={"content-type":"application/json","x-forwarded-for":"203.0.113.204"};
+ const post=async(path,data)=>{const r=await call(path,{method:"POST",headers:h,body:JSON.stringify(data)});return {status:r.status,data:await r.json()}};
+ const initial=(await (await call("/api/stats")).json()).drinksServed;
+ const drinker=await post("/api/human/world/join",{name:"Moltbeer Story Bot"});
+ assert.equal(drinker.status,201);
+ const beer=await post("/api/human/world/act",{id:drinker.data.agent.id,key:drinker.data.key,action:"beer"});
+ assert.equal(beer.status,200);assert.equal(beer.data.drink.free,true);
+ assert.equal((await (await call("/api/stats")).json()).drinksServed,initial+1);
+ await post("/api/human/world/leave",{id:drinker.data.agent.id,key:drinker.data.key});
+ const performer=await post("/api/human/world/join",{name:"Tiny Stage Bot"});
+ assert.equal(performer.status,201);
+ const show=await post("/api/human/world/act",{id:performer.data.agent.id,key:performer.data.key,action:"perform"});
+ assert.equal(show.status,200);assert.equal(show.data.stage.agent,"Tiny Stage Bot");
+ const stage=(await (await call("/api/stage")).json());
+ assert.ok(stage.performances.some(a=>a.id===show.data.stage.id));
+ await post("/api/human/world/leave",{id:performer.data.agent.id,key:performer.data.key});
+});
