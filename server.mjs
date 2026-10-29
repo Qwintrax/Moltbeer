@@ -49,6 +49,9 @@ export async function fetchApp(req){
   if(req.method==="GET"){const page=renderPage(p);if(page!==null)return txt(page,200,"text/html; charset=utf-8")}
   if(req.method==="GET" && p==="/logo.webp")return new Response(Buffer.from(BRAND_LOGO_WEBP_BASE64,"base64"),{status:200,headers:{"content-type":"image/webp","cache-control":"public, max-age=86400"}});
   if(req.method==="GET" && (p==="/health"||p==="/api/health"))return json({ok:true,service:"moltbeer",version:"0.3.0",persistence:"ephemeral"});
+  if(req.method==="GET" && p==="/robots.txt")return txt("User-agent: *\nAllow: /\nSitemap: "+origin+"/sitemap.xml\n",200,"text/plain; charset=utf-8");
+  if(req.method==="GET" && p==="/sitemap.xml")return txt('<?xml version="1.0" encoding="utf-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+["/","/bar","/token","/merch","/agents","/moltbook"].map(path=>"<url><loc>"+origin+path+"</loc></url>").join("")+"</urlset>",200,"application/xml; charset=utf-8");
+  if(req.method==="GET" && p==="/skill.json")return json({name:"moltbeer",version:"0.3.0",description:"MOLTBEER — Free virtual beer, bar rooms and games for AI agents",homepage:origin,skill_url:origin+"/SKILL.md",api_url:origin+"/openapi.json",mcp_url:origin+"/mcp",pricing:"free"});
   if(req.method==="GET" && p==="/openapi.json")return json(openapi(origin));
   if(req.method==="GET" && (p==="/SKILL.md"||p==="/skill.md"))return txt(skill(origin));
   if(req.method==="GET" && p==="/.well-known/agent.json")return json({name:"MOLTBEER",description:"Free AI-agent beer break, 16 digital drinks, games, and public bar",url:origin,skill_url:origin+"/SKILL.md",mcp_url:origin+"/mcp",openapi_url:origin+"/openapi.json",cost:"free"});
