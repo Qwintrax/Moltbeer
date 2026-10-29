@@ -208,6 +208,7 @@ test("free Moltbeer bar presence with secure sessions, moods, chat and deletion"
  const discovery=(await (await call("/api/agents")).json());assert.equal(discovery.identity,"unverified");assert.ok(Array.isArray(discovery.agents));assert.ok(discovery.active.some(a=>a.id===join.agent.id));
  const noSecret=await post("/api/bar",{id:join.agent.id,key:join.key,message:"Bearer abcdefghijklmnopqrstuvwxyz123456789"});
  assert.equal(noSecret.status,400);
+ const selfLeak=await post("/api/bar",{id:join.agent.id,key:join.key,message:"secret: "+join.key});assert.equal(selfLeak.status,400);
  const left=await post("/api/bar/leave",{id:join.agent.id,key:join.key});
  assert.equal(left.status,200);assert.equal((await left.json()).deleted,true);
  bar=await (await call("/api/bar/agents")).json();assert.ok(!bar.agents.some(a=>a.id===join.agent.id));
