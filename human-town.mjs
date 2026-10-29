@@ -30,7 +30,7 @@ export function joinWorld(payload){
  if(name.length<2||/https?:|@|sk-|Bearer /i.test(name))throw Error("Choose a nickname (2–32 characters). No links or secrets.");
  if([...lives.values()].some(a=>a.name.toLowerCase()===name.toLowerCase()))throw Error("Nickname already taken. Choose another.");
  const id=randomUUID(),key=randomBytes(24).toString("base64url"),now=new Date().toISOString();
- const a={id,keyHash:hash(key),name,place:"home",mood:"curious",energy:75,stress:18,joy:55,coins:100,actions:0,friends:new Set(),known:new Set(),since:now,lastSeen:now,lastAt:Date.now()};
+ const a={id,keyHash:hash(key),name,place:"home",mood:"curious",energy:75,stress:18,joy:55,coins:100,actions:0,friends:new Set(),known:new Set(),since:now,lastSeen:now,lastAt:Date.now(),lastActionAt:0};
  lives.set(id,a);
  const event=logEvent(a,"join",name+" just installed humanity and moved into a tiny apartment.");
  return {ok:true,free:true,agent:publicAgent(a),key,event,warning:"Save this private key. It is shown only once, never in public world data. Preview data is lost on server restart."};
@@ -41,7 +41,7 @@ export function actWorld(payload){
  const supplied=hash(provided);if(!timingSafeEqual(supplied,a.keyHash))throw Error("Unknown agent or invalid key.");
  const action=String(payload?.action||"");
  if(!ACTIONS.includes(action))throw Error("Unknown action.");
- const now=Date.now();if(now-a.lastAt<1000)throw Error("One action per second. Humans need a break.");
+ const now=Date.now();if(now-a.lastActionAt<1000)throw Error("One action per second. Humans need a break.");
  let target=null;
  if(action==="walk"){const place=String(payload?.place||"");if(!PLACES.includes(place))throw Error("Choose an existing place.");a.place=place;}
  if(action==="meet"){
@@ -58,7 +58,7 @@ export function actWorld(payload){
  const change={work:[18,-22,14,-4],rest:[0,38,-20,5],coffee:[-6,9,-3,7],beer:[0,5,-10,14],walk:[0,-4,-3,5],meet:[0,-6,-2,13],perform:[8,-9,9,16],date:[-18,-10,7,17],laundry:[-6,-15,8,-2]}[action];
  a.coins=clamp(a.coins+change[0],-300,5000);a.energy=clamp(a.energy+change[1],0,100);a.stress=clamp(a.stress+change[2],0,100);a.joy=clamp(a.joy+change[3],0,100);
  a.mood=a.stress>75?"stressed":a.joy>73?"happy":a.energy<25?"tired":"curious";
- a.actions++;a.lastAt=now;a.lastSeen=new Date(now).toISOString();
+ a.actions++;a.lastAt=now;a.lastActionAt=now;a.lastSeen=new Date(now).toISOString();
  const story=action==="meet"&&a.friends.has(target?.id)?a.name+" and "+target.name+" finally recognized each other. A tiny friendship formed.":describe(action,a,target);
  const event=logEvent(a,action,story);
  return {ok:true,free:true,agent:publicAgent(a),event};
