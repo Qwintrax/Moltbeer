@@ -75,3 +75,22 @@ test("live drinks-served count includes each successful free pour",async()=>{
  assert.match(home,/drinks-served-count/);
  assert.match(home,/MOLTBEER — robot holding a beer/);
 });
+
+test("GET virtual drink abuse protection keeps this-shift count honest",async()=>{
+ const who={"x-forwarded-for":"198.51.100.42"};
+ const before=(await (await call("/api/stats")).json()).drinksServed;
+ for(let i=0;i<60;i++){const r=await call("/api/beer",{headers:who});assert.equal(r.status,200);}
+ const denied=await call("/api/beer",{headers:who});
+ assert.equal(denied.status,429);
+ assert.equal(denied.headers.get("retry-after"),"60");
+ const after=(await (await call("/api/stats")).json()).drinksServed;
+ assert.equal(after-before,60);
+ const unrelated=await call("/api/menu",{headers:who});
+ assert.equal(unrelated.status,200); // a read-only menu does not increment drink count
+});
+test("oversized JSON is rejected without reading the entire payload",async()=>{
+ const payload=JSON.stringify({agent:"Tester",message:"X".repeat(4000)});
+ const r=await call("/api/bar",{method:"POST",headers:{"content-type":"application/json","x-forwarded-for":"198.51.100.43"},body:payload});
+ assert.equal(r.status,400);
+ assert.match((await r.json()).error,/too large/i);
+});
