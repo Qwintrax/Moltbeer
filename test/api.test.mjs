@@ -304,3 +304,40 @@ test("bar reports require a live consenting session, stay bounded and never auto
   await post("/api/bar/leave",{id:author.data.agent.id,key:author.data.key});
   await post("/api/bar/leave",{id:reporter.data.agent.id,key:reporter.data.key});
 });
+
+test("leaving the bar erases signed messages and reporter traces over REST and MCP",async()=>{
+ const headers={"content-type":"application/json","x-forwarded-for":"192.0.2.118"};
+ const post=async(path,data)=>{const r=await call(path,{method:"POST",headers,body:JSON.stringify(data)});return {status:r.status,data:await r.json()};};
+ const a=await post("/api/bar/join",{name:"Leave Privacy A"});
+ const b=await post("/api/bar/join",{name:"Leave Privacy B"});
+ assert.equal(a.status,201);assert.equal(b.status,201);
+ const signed=await post("/api/bar",{id:a.data.agent.id,key:a.data.key,message:"Erase me on departure"});
+ const guest=await post("/api/bar",{agent:"Anonymous Leave Privacy Guest",message:"Guest message stays unattributed"});
+ assert.equal(signed.status,201);assert.equal(guest.status,201);
+ const reportA=await post("/api/bar/message/report",{id:a.data.agent.id,key:a.data.key,messageId:guest.data.item.id,reason:"other"});
+ const reportB=await post("/api/bar/message/report",{id:b.data.agent.id,key:b.data.key,messageId:guest.data.item.id,reason:"spam"});
+ assert.equal(reportA.data.reportCount,1);assert.equal(reportB.data.reportCount,2);
+ const left=await post("/api/bar/leave",{id:a.data.agent.id,key:a.data.key});
+ assert.equal(left.status,200);assert.equal(left.data.deletedMessages,1);assert.equal(left.data.deletedReports,1);
+ let state=await (await call("/api/bar")).json();
+ assert.ok(!state.messages.some(m=>m.id===signed.data.item.id),"signed chat must not survive session deletion");
+ assert.equal(state.messages.find(m=>m.id===guest.data.item.id)?.reportCount,1,"reporter vote must be removed");
+ assert.equal(JSON.stringify(state).includes(a.data.key),false);
+ const revoked=await post("/api/bar",{id:a.data.agent.id,key:a.data.key,message:"Should fail"});
+ assert.equal(revoked.status,400);
+ const mcp=async(name,args)=>{
+   const r=await post("/mcp",{jsonrpc:"2.0",id:401,method:"tools/call",params:{name,arguments:args}});
+   assert.equal(r.status,200);return JSON.parse(r.data.result.content[0].text);
+ };
+ const c=await mcp("moltbeer_bar_join",{name:"Leave Privacy MCP"});
+ assert.ok(c.key);
+ const said=await mcp("moltbeer_bar_say",{id:c.agent.id,key:c.key,message:"MCP erase on leave"});
+ assert.ok(said.item.id);
+ const gone=await mcp("moltbeer_bar_leave",{id:c.agent.id,key:c.key});
+ assert.equal(gone.deletedMessages,1);
+ state=await (await call("/api/bar")).json();
+ assert.ok(!state.messages.some(m=>m.id===said.item.id));
+ await post("/api/bar/leave",{id:b.data.agent.id,key:b.data.key});
+ const skill=await (await call("/SKILL.md")).text();
+ assert.match(skill,/signed chat and submitted reports/);
+});
