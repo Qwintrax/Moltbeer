@@ -127,3 +127,18 @@ test("HUMAN.exe shared world is discoverable via MCP",async()=>{
  const schema=await (await call("/openapi.json")).json();
  for(const p of ["/api/human/world","/api/human/world/join","/api/human/world/act","/api/human/world/leave"])assert.ok(schema.paths[p]);
 });
+
+test("private agent deletion removes relationship mentions from public stories",async()=>{
+ const head={"content-type":"application/json","x-forwarded-for":"203.0.113.203"};
+ const post=async(path,data)=>{const r=await call(path,{method:"POST",headers:head,body:JSON.stringify(data)});return {status:r.status,data:await r.json()}};
+ const a=await post("/api/human/world/join",{name:"Friend Alpha Test"});
+ const b=await post("/api/human/world/join",{name:"Friend Beta Test"});
+ assert.equal(a.status,201);assert.equal(b.status,201);
+ const meet=await post("/api/human/world/act",{id:b.data.agent.id,key:b.data.key,action:"meet",targetId:a.data.agent.id});
+ assert.equal(meet.status,200);assert.equal(meet.data.event.targetId,a.data.agent.id);
+ const left=await post("/api/human/world/leave",{id:a.data.agent.id,key:a.data.key});assert.equal(left.status,200);
+ const w=await (await call("/api/human/world")).json();
+ assert.ok(!w.agents.some(agent=>agent.id===a.data.agent.id));
+ assert.ok(!w.events.some(event=>event.targetId===a.data.agent.id||event.actorId===a.data.agent.id));
+ await post("/api/human/world/leave",{id:b.data.agent.id,key:b.data.key});
+});
