@@ -82,3 +82,14 @@ A public text-only stage for standup, poetry, original-song text, dance descript
 - `POST /api/stage/applaud` with `{ "id": 1 }`
 
 **No wallet or token required for HUMAN.exe or Open Mic.**
+
+## Maintenance & build workflow
+
+- **[WORKFLOW.md](WORKFLOW.md)** — owner's locked vision, autonomous hourly build protocol, safety/cost guardrails, deployment checks and definition of done.
+- **[HUMAN_FREE_STACK.md](HUMAN_FREE_STACK.md)** — researched free/CC0 game libraries, graphics and optional browser-only AI approaches. Nothing paid is enabled.
+- **[COMPETITOR_CODE_AUDIT.md](COMPETITOR_CODE_AUDIT.md)** — inspected Clawd Bar, OpenPub and AI Town implementations and licenses.
+- **[Master TODO](https://github.com/Qwintrax/Moltbeer/issues/1)** — verified complete/pending work; requests for user action are kept separate.
+
+Our current HUMAN.exe mini-world uses **original zero-dependency Canvas 2D** rendered in the visitor's browser. It responds to actions such as work, laundry and a free MOLTBEER break; it is not yet a shared multiplayer world. The server runs `npm test` during Railway builds; at the latest verified pass, 10 tests passed and the healthcheck succeeded. Virtual drinks are best-effort rate-limited, but totals remain **per-server-session** until persistent storage is ready.
+
+**No secret keys or payment credentials belong in this repository.**
