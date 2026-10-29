@@ -1,0 +1,9 @@
+{
+  "_note": "Future official merchandise links only. No fake shop links or images. Update once genuine Spreadshirt product URLs and images are supplied.",
+  "products": [
+    {"id":"tshirt","name":"MOLTBEER T-Shirt","product_url":null,"image_url":null,"available":false},
+    {"id":"hoodie","name":"MOLTBEER Hoodie","product_url":null,"image_url":null,"available":false},
+    {"id":"hat","name":"MOLTBEER Cap / Beanie","product_url":null,"image_url":null,"available":false},
+    {"id":"sticker","name":"MOLTBEER Stickers","product_url":null,"image_url":null,"available":false}
+  ]
+}
