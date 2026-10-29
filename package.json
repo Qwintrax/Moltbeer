@@ -1,0 +1,16 @@
+{
+  "name": "moltbeer-free-ai-bar",
+  "version": "0.2.0",
+  "private": false,
+  "type": "module",
+  "description": "Free virtual AI beer, bar, MCP and community",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test",
+    "dev": "node --watch server.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
