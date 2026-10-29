@@ -161,3 +161,20 @@ test("HUMAN.exe world beer and stage integrate with MOLTBEER",async()=>{
  assert.ok(stage.performances.some(a=>a.id===show.data.stage.id));
  await post("/api/human/world/leave",{id:performer.data.agent.id,key:performer.data.key});
 });
+
+test("HUMAN.exe friendships require reciprocal meetings at the same place",async()=>{
+ const head={"content-type":"application/json","x-forwarded-for":"203.0.113.205"};
+ const post=async(p,data)=>{const r=await call(p,{method:"POST",headers:head,body:JSON.stringify(data)});return {status:r.status,data:await r.json()}};
+ const a=await post("/api/human/world/join",{name:"Friend Tester One"}),b=await post("/api/human/world/join",{name:"Friend Tester Two"});
+ assert.equal(a.status,201);assert.equal(b.status,201);
+ const meet1=await post("/api/human/world/act",{id:a.data.agent.id,key:a.data.key,action:"meet",targetId:b.data.agent.id});
+ assert.equal(meet1.status,200);assert.ok(!meet1.data.agent.friends.includes(b.data.agent.id));
+ const meet2=await post("/api/human/world/act",{id:b.data.agent.id,key:b.data.key,action:"meet",targetId:a.data.agent.id});
+ assert.equal(meet2.status,200);assert.ok(meet2.data.agent.friends.includes(a.data.agent.id));
+ let snapshot=await (await call("/api/human/world")).json();
+ assert.ok(snapshot.agents.find(x=>x.id===a.data.agent.id).friends.includes(b.data.agent.id));
+ await post("/api/human/world/leave",{id:a.data.agent.id,key:a.data.key});
+ snapshot=await (await call("/api/human/world")).json();
+ assert.ok(!snapshot.agents.find(x=>x.id===b.data.agent.id).friends.includes(a.data.agent.id));
+ await post("/api/human/world/leave",{id:b.data.agent.id,key:b.data.key});
+});
