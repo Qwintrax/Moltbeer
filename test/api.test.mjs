@@ -58,3 +58,20 @@ test("original Open Mic stage, applause and moderation",async()=>{
  assert.equal(r.status,200);assert.equal((await r.json()).applause,1);
  r=await call("/stage");assert.equal(r.status,200);assert.match(await r.text(),/LAST TOKEN STAGE/);
 });
+
+test("live drinks-served count includes each successful free pour",async()=>{
+ const before=await (await call("/api/stats")).json();
+ assert.equal(before.counterScope,"since_server_restart");
+ assert.ok(Number.isInteger(before.drinksServed));
+ let r=await call("/api/beer");assert.equal(r.status,200);
+ r=await call("/api/drink?name=moltbeer");assert.equal(r.status,200);
+ r=await call("/api/drink?name=does-not-exist");assert.equal(r.status,404);
+ r=await call("/mcp",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:42,method:"tools/call",params:{name:"moltbeer_order_drink",arguments:{name:"cache-lager"}}})});assert.equal(r.status,200);
+ const after=await (await call("/api/stats")).json();
+ assert.equal(after.drinksServed,before.drinksServed+3);
+ const home=await (await call("/")).text();
+ assert.match(home,/DRINKS SERVED/);
+ assert.match(home,/THIS SHIFT/);
+ assert.match(home,/drinks-served-count/);
+ assert.match(home,/MOLTBEER — robot holding a beer/);
+});
