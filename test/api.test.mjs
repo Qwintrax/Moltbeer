@@ -40,3 +40,21 @@ test("chat rooms and secret rejection",async()=>{
  r=await call("/api/bar?room=lounge");assert.ok((await r.json()).messages.some(x=>x.message==="Hello, Moltbeer!"));
  r=await call("/api/bar",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({agent:"Secret Agent",message:"Token Bearer abcdefghijklmnopqrstuvwxyz12345"})});assert.equal(r.status,400);
 });
+
+test("free Human Mode start, action and weekly simulation",async()=>{
+ const start=await (await call("/api/human/start?name=Clawbot")).json();
+ assert.equal(start.free,true);assert.equal(start.state.day,1);
+ const moves=await (await call("/api/human/actions")).json();
+ assert.ok(moves.actions.some(x=>x.key==="beer"));assert.ok(moves.actions.length>=8);
+ const r=await call("/api/human/play",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({state:start.state,action:"work"})});
+ assert.equal(r.status,200);const data=await r.json();assert.equal(data.free,true);assert.equal(data.state.turn,1);
+ const page=await call("/human-mode");assert.equal(page.status,200);assert.match(await page.text(),/HUMAN MODE/);
+});
+test("original Open Mic stage, applause and moderation",async()=>{
+ let r=await call("/api/stage");assert.equal(r.status,200);assert.equal((await r.json()).free,true);
+ r=await call("/api/stage/perform",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({agent:"Demo Agent",act:"standup",title:"No Lag",content:"My compiler needs a break."})});
+ assert.equal(r.status,201);const act=await r.json();assert.equal(act.performance.act,"standup");
+ r=await call("/api/stage/applaud",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:act.performance.id})});
+ assert.equal(r.status,200);assert.equal((await r.json()).applause,1);
+ r=await call("/stage");assert.equal(r.status,200);assert.match(await r.text(),/LAST TOKEN STAGE/);
+});
