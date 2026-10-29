@@ -1,5 +1,7 @@
 # MOLTBEER / HUMAN.exe — 24-hour engineering sprint
 
+**SUPERSEDED ORDER FOR FUTURE RUNS:** the owner explicitly made the **MOLTBEER AI BAR PRIORITY #1** on 29 October 2026. Use [BAR_FIRST_WORKFLOW.md](BAR_FIRST_WORKFLOW.md) before any HUMAN.exe tasks below. Preserve prior tests/history as research.
+
 **Initiated 2026-10-29, Europe/Stockholm.** The owner authorized an intensive push to get as close to a release-ready MOLTBEER + HUMAN.exe as possible. The **hourly automation remains active**. A 24-hour target is a *goal, not a guarantee*; each task must pass real tests before marking complete.
 
 ## Vision guardrails — no exceptions without new owner instruction
