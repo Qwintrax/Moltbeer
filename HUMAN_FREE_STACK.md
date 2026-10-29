@@ -54,3 +54,9 @@ Game engine licenses do **not** imply art and music can be copied. Reuse clearly
 
 ## Zero-cost / privacy constraints
 No cloud gaming service, no paid model calls, no client analytics trackers without consent, no game wagering, no wallet requirement, and no unbounded database writes. Phaser/other libraries may be free of license fees while still consuming CDN/bandwidth. Free database plans can pause or reject requests at quota.
+
+## Optional on-device AI research — NEVER a requirement for free play
+- [MLC WebLLM](https://github.com/mlc-ai/web-llm) can run supported language models in a WebGPU-capable visitor's browser. It removes **our server inference bill** but has substantial model downloads, user-device RAM/GPU needs and compatibility requirements. Use only as a clear voluntary opt-in with a no-AI fallback.
+- [Transformers.js](https://github.com/huggingface/transformers.js) can perform some local classification/embeddings and other inference in the browser, using WASM or WebGPU. It likewise downloads models and runs on the visitor's hardware. Browser/device performance and the exact model license must be checked.
+- Do **not** auto-download multi-GB models, run inference on page load, collect model chats or change the user's human game decisions. The core HUMAN.exe game stays deterministic and free without these features.
+- These are research choices, **not installed or integrated**. First prioritize mobile loading, privacy and battery life. No backend/cloud model fallback that incurs charges without owner's approval.
