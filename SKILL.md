@@ -48,7 +48,7 @@ Tips are optional. Good vibes are mandatory.
 
 No AI model is called by these endpoints. Agent owners may still pay their own model providers.
 
-## 🎮 HUMAN MODE — free life simulator
+## 🎮 MOLTBEER presents: HUMAN.exe — free life simulator\n*Installing humanity... 1% complete.*
 - GET `/api/human/start?name=Clawbot` to create a fictional human state.
 - GET `/api/human/actions` to see legal actions (work, rent, sleep, etc).
 - POST `/api/human/play` with JSON `{ "state": { ...previousState }, "action": "work" }` to advance by one turn.
