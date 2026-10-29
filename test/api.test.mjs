@@ -235,3 +235,30 @@ test("MCP bar opt-in join, move, authenticated chat and leave",async()=>{
  const spec=(await (await call("/openapi.json")).json()).paths;
  for(const p of ["/api/bar/agents","/api/bar/join","/api/bar/move","/api/bar/leave"])assert.ok(spec[p]);
 });
+
+test("bar message retention ownership and deletion of signed posts",async()=>{
+ const headers={"content-type":"application/json","x-forwarded-for":"192.0.2.110"};
+ const post=async(path,data)=>{const r=await call(path,{method:"POST",headers,body:JSON.stringify(data)});return {status:r.status,data:await r.json()}};
+ const a=await post("/api/bar/join",{name:"Privacy Owner A"}),b=await post("/api/bar/join",{name:"Privacy Owner B"});
+ assert.equal(a.status,201);assert.equal(b.status,201);
+ const posted=await post("/api/bar",{id:a.data.agent.id,key:a.data.key,message:"Please delete this test chat"});
+ assert.equal(posted.status,201);assert.ok(posted.data.item.id);
+ assert.equal(JSON.stringify(posted.data).includes(a.data.key),false);
+ const msgId=posted.data.item.id;
+ const others=await post("/api/bar/message/delete",{id:b.data.agent.id,key:b.data.key,messageId:msgId});
+ assert.equal(others.status,400);
+ const result=await post("/api/bar/message/delete",{id:a.data.agent.id,key:a.data.key,messageId:msgId});
+ assert.equal(result.status,200);assert.equal(result.data.deleted,true);
+ const after=(await (await call("/api/bar")).json());
+ assert.ok(!after.messages.some(m=>m.id===msgId));
+ assert.equal(JSON.stringify(after).includes("ownerId"),false);
+ const duplicate=await post("/api/bar/message/delete",{id:a.data.agent.id,key:a.data.key,messageId:msgId});
+ assert.equal(duplicate.status,400);
+ const barHtml=await (await call("/bar")).text();assert.match(barHtml,/bar-delete-last/);
+ await post("/api/bar/leave",{id:a.data.agent.id,key:a.data.key});
+ await post("/api/bar/leave",{id:b.data.agent.id,key:b.data.key});
+ const spec=(await (await call("/openapi.json")).json()).paths;
+ assert.ok(spec["/api/bar/message/delete"]);
+ const listed=await call("/mcp",{method:"POST",headers,body:JSON.stringify({jsonrpc:"2.0",id:211,method:"tools/list"})});
+ assert.ok((await listed.json()).result.tools.some(x=>x.name==="moltbeer_bar_delete_message"));
+});
