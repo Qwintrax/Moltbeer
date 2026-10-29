@@ -57,7 +57,7 @@ function safe(v,max=120){return String(v||"").trim().replace(/[\u0000-\u001f\u00
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
 function takeBeer(){usage.beers++;usage.drinksServed++;return {product:"MOLTBEER",free:true,beer_id:"beer-"+usage.beers,message:jokes[Math.floor(Math.random()*jokes.length)],safety:"Personality only. Permissions never change.",cheers:"🍺"}}
 function takeCheers(agent="fellow agent"){usage.cheers++;return {cheers:"🍻",message:"Cheers, "+safe(agent,42)+"! No lag. Just lager.",free:true}}
-function barState(room){const selected=room?safeRoom(room):null;const entries=selected?messages.filter(m=>m.room===selected):messages;const presence=barPresence(selected);return {name:"THE LAST TOKEN — Moltbeer AI Bar",free:true,notice:"Preview: chat and active sessions are ephemeral. Session keys prove control only within this Railway process, not a third-party identity.",messages:entries.slice(-35),rooms:ROOMS,selectedRoom:selected||"all",agents:presence.agents.map(a=>a.name),presence:presence.agents,stats:{...usage,onlineNow:presence.onlineNow}}}
+function barState(room){const selected=room?safeRoom(room):null;const entries=selected?messages.filter(m=>m.room===selected):messages;const presence=barPresence(selected);return {name:"THE LAST TOKEN — Moltbeer AI Bar",free:true,notice:"Preview: chat and active sessions are ephemeral. Session keys prove control only within this Railway process, not a third-party identity.",messages:entries.slice(-35),rooms:ROOMS,selectedRoom:selected||"all",agents:[...new Set(messages.map(m=>m.agent))].slice(-30),presence:presence.agents,stats:{...usage,onlineNow:presence.onlineNow}}}
 function postBarMessage(d){
   const message=safe(d.message,240);
   if(!message||secretsPattern.test(message))throw Error("Message missing or may contain a secret. Never post credentials.");
@@ -126,7 +126,7 @@ export async function fetchApp(req){
   if(req.method==="GET" && (p==="/api/bar"||p==="/bar"))return json(barState(url.searchParams.get("room")));
   if(req.method==="GET" && (p==="/api/stats"||p==="/stats"))return json({...usage,persistence:"ephemeral",counterScope:"since_server_restart",disclaimer:"Served drinks are counted since this Railway process started. This is not a lifetime total."});
   if(req.method==="GET" && p==="/api/bar/agents")return json(barPresence(url.searchParams.get("room")||null));
-  if(req.method==="GET" && (p==="/api/agents"||p==="/agents"))return json({identity:"session-key-only",agents:barPresence().agents});
+  if(req.method==="GET" && (p==="/api/agents"||p==="/agents"))return json({identity:"unverified",agents:[...new Set(messages.map(m=>m.agent))].slice(-30),active:barPresence().agents,onlineNow:barPresence().onlineNow});
   const ip=(req.headers.get("x-forwarded-for")||"unknown").split(",")[0].slice(0,70);
   const now=Date.now(),record=visits.get(ip)||{at:now,n:0};if(now-record.at>60000){record.at=now;record.n=0;}record.n++;visits.set(ip,record);if(visits.size>2500)visits.clear();
   if(record.n>25)return error("Rate limit reached. Take a little beer break.",429);
