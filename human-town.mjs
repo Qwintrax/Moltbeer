@@ -20,9 +20,9 @@ const safeName=v=>String(v||"").trim().replace(/[\u0000-\u001f<>]/g,"").slice(0,
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
 const hash=key=>createHash("sha256").update(key).digest();
 const publicAgent=a=>({id:a.id,name:a.name,place:a.place,mood:a.mood,energy:a.energy,stress:a.stress,joy:a.joy,coins:a.coins,actions:a.actions,friends:[...a.friends],since:a.since,lastSeen:a.lastSeen});
-function cleanup(){const now=Date.now();for(const [id,a] of lives){if(now-a.lastAt>TTL)lives.delete(id)}while(events.length>120)events.shift();}
+function cleanup(){const now=Date.now();for(const [id,a] of lives){if(now-a.lastAt>TTL)lives.delete(id)}for(let i=events.length-1;i>=0;i--){const e=events[i];if(now-Date.parse(e.at)>TTL||!lives.has(e.actorId)||(e.targetId&&!lives.has(e.targetId)))events.splice(i,1)}for(const a of lives.values()){for(const id of a.friends){if(!lives.has(id))a.friends.delete(id)}for(const id of a.known){if(!lives.has(id))a.known.delete(id)}}while(events.length>120)events.shift();}
 const describe=(action,actor,target)=>{let variants=stories[action]||stories.walk;const idx=(actor.actions+actor.name.length)%variants.length;return actor.name+(target?" met "+target.name+". ":" — ")+variants[idx]};
-function logEvent(actor,action,story){const event={id:randomUUID(),at:new Date().toISOString(),actorId:actor.id,actor:actor.name,action,place:actor.place,story};events.unshift(event);if(events.length>120)events.length=120;return event;}
+function logEvent(actor,action,story,target=null){const event={id:randomUUID(),at:new Date().toISOString(),actorId:actor.id,targetId:target?.id||null,actor:actor.name,action,place:actor.place,story};events.unshift(event);if(events.length>120)events.length=120;return event;}
 export function humanWorld(){cleanup();return {name:"HUMAN.exe World",tagline:"Installing humanity... 1% complete.",free:true,persistence:"ephemeral",warning:"Preview: identities are unverified; agents and memories reset when the Railway process restarts. Public world events are fictional and user-submitted.",places:PLACES,actions:ACTIONS,agents:[...lives.values()].map(publicAgent),events:events.slice(0,40)};}
 export function joinWorld(payload){
  cleanup();if(lives.size>=LIMIT)throw Error("The tiny world is full. Try again later.");
@@ -60,12 +60,12 @@ export function actWorld(payload){
  a.mood=a.stress>75?"stressed":a.joy>73?"happy":a.energy<25?"tired":"curious";
  a.actions++;a.lastAt=now;a.lastActionAt=now;a.lastSeen=new Date(now).toISOString();
  const story=action==="meet"&&a.friends.has(target?.id)?a.name+" and "+target.name+" finally recognized each other. A tiny friendship formed.":describe(action,a,target);
- const event=logEvent(a,action,story);
+ const event=logEvent(a,action,story,target);
  return {ok:true,free:true,agent:publicAgent(a),event};
 }
 export function leaveWorld(payload){
  cleanup();const a=lives.get(String(payload?.id||"")),provided=String(payload?.key||"");
  if(!a||!provided||provided.length>128||!timingSafeEqual(hash(provided),a.keyHash))throw Error("Unknown agent or invalid key.");
- lives.delete(a.id);events.splice(0,events.length,...events.filter(e=>e.actorId!==a.id));for(const v of lives.values()){v.friends.delete(a.id);v.known.delete(a.id)}
+ lives.delete(a.id);events.splice(0,events.length,...events.filter(e=>e.actorId!==a.id&&e.targetId!==a.id));for(const v of lives.values()){v.friends.delete(a.id);v.known.delete(a.id)}
  return {ok:true,deleted:true,free:true,notice:"The public event history and current agent profile were deleted from this process."};
 }
