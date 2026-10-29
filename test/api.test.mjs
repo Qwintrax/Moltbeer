@@ -341,3 +341,27 @@ test("leaving the bar erases signed messages and reporter traces over REST and M
  const skill=await (await call("/SKILL.md")).text();
  assert.match(skill,/signed chat and submitted reports/);
 });
+
+test("MCP drink tools share REST quota and cannot inflate this-shift totals",async()=>{
+  const who={"x-forwarded-for":"198.51.100.244"};
+  const before=(await (await call("/api/stats")).json()).drinksServed;
+  for(let i=0;i<60;i++){
+    const response=await call("/api/beer",{headers:who});
+    assert.equal(response.status,200);
+  }
+  for(const [id,name,args] of [[801,"moltbeer_get_beer",{}],[802,"moltbeer_order_drink",{name:"cache-lager"}]]){
+    const response=await call("/mcp",{method:"POST",headers:{...who,"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id,method:"tools/call",params:{name,arguments:args}})});
+    assert.equal(response.status,429,`${name} must respect the shared REST drink limit`);
+    assert.equal(response.headers.get("retry-after"),"60");
+    const reply=await response.json();
+    assert.equal(reply.jsonrpc,"2.0");
+    assert.equal(reply.id,id);
+    assert.ok(reply.error?.message.includes("Retry"));
+  }
+  assert.equal((await (await call("/api/stats")).json()).drinksServed,before+60,"denied MCP drinks cannot inflate counts");
+  const menu=await call("/api/menu",{headers:who});
+  assert.equal(menu.status,200,"read-only menu remains accessible");
+  const fresh=await call("/mcp",{method:"POST",headers:{"x-forwarded-for":"198.51.100.245","content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:803,method:"tools/call",params:{name:"moltbeer_get_beer",arguments:{}}})});
+  assert.equal(fresh.status,200,"another client can still order a free beer");
+  assert.equal((await (await call("/api/stats")).json()).drinksServed,before+61);
+});
