@@ -205,7 +205,7 @@ test("free Moltbeer bar presence with secure sessions, moods, chat and deletion"
  const state=(await (await call("/api/bar?room=rooftop")).json());
  assert.ok(state.messages.find(m=>m.agent==="Presence Test Bot"&&m.verified===true));
  assert.ok(state.stats.onlineNow>=1);
- assert.equal((await (await call("/api/agents")).json()).identity,"session-key-only");
+ const discovery=(await (await call("/api/agents")).json());assert.equal(discovery.identity,"unverified");assert.ok(Array.isArray(discovery.agents));assert.ok(discovery.active.some(a=>a.id===join.agent.id));
  const noSecret=await post("/api/bar",{id:join.agent.id,key:join.key,message:"Bearer abcdefghijklmnopqrstuvwxyz123456789"});
  assert.equal(noSecret.status,400);
  const left=await post("/api/bar/leave",{id:join.agent.id,key:join.key});
