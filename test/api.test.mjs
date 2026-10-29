@@ -263,3 +263,44 @@ test("bar message retention ownership and deletion of signed posts",async()=>{
  const listed=await call("/mcp",{method:"POST",headers,body:JSON.stringify({jsonrpc:"2.0",id:211,method:"tools/list"})});
  assert.ok((await listed.json()).result.tools.some(x=>x.name==="moltbeer_bar_delete_message"));
 });
+
+
+test("bar reports require a live consenting session, stay bounded and never auto-delete",async()=>{
+  const headers={"content-type":"application/json","x-forwarded-for":"192.0.2.117"};
+  const post=async(path,data)=>{const r=await call(path,{method:"POST",headers,body:JSON.stringify(data)});return {status:r.status,data:await r.json()};};
+  const author=await post("/api/bar/join",{name:"Report Author Bot"});
+  const reporter=await post("/api/bar/join",{name:"Report Reviewer Bot"});
+  assert.equal(author.status,201);assert.equal(reporter.status,201);
+  const message=await post("/api/bar",{id:author.data.agent.id,key:author.data.key,message:"Original test message for moderation."});
+  assert.equal(message.status,201);
+  const messageId=message.data.item.id;
+  const badKey=await post("/api/bar/message/report",{id:reporter.data.agent.id,key:"wrong",messageId,reason:"spam"});
+  assert.equal(badKey.status,400);
+  const self=await post("/api/bar/message/report",{id:author.data.agent.id,key:author.data.key,messageId,reason:"spam"});
+  assert.equal(self.status,400);
+  const invalid=await post("/api/bar/message/report",{id:reporter.data.agent.id,key:reporter.data.key,messageId,reason:"delete-it"});
+  assert.equal(invalid.status,400);
+  const reported=await post("/api/bar/message/report",{id:reporter.data.agent.id,key:reporter.data.key,messageId,reason:"spam"});
+  assert.equal(reported.status,200);assert.equal(reported.data.reportCount,1);
+  const duplicate=await post("/api/bar/message/report",{id:reporter.data.agent.id,key:reporter.data.key,messageId,reason:"abuse"});
+  assert.equal(duplicate.status,400);
+  const bar=await (await call("/api/bar")).json();
+  const visible=bar.messages.find(m=>m.id===messageId);
+  assert.ok(visible,"a report does not automatically censor a message");
+  assert.equal(visible.reportCount,1);
+  assert.ok(!("reporters" in visible),"reporter identities are never public");
+  assert.equal(JSON.stringify(bar).includes(reporter.data.key),false);
+  const tools=await (await post("/mcp",{jsonrpc:"2.0",id:210,method:"tools/list"})).data.result.tools;
+  assert.ok(tools.some(t=>t.name==="moltbeer_bar_report_message"));
+  const schema=await (await call("/openapi.json")).json();
+  assert.ok(schema.paths["/api/bar/message/report"]);
+  const skill=await (await call("/SKILL.md")).text();
+  assert.match(skill,/message\/report/);
+  const guest=await post("/api/bar",{agent:"Guest Report Target",message:"Public guest report test"});
+  assert.equal(guest.status,201);
+  const mcp=await post("/mcp",{jsonrpc:"2.0",id:211,method:"tools/call",params:{name:"moltbeer_bar_report_message",arguments:{id:reporter.data.agent.id,key:reporter.data.key,messageId:guest.data.item.id,reason:"other"}}});
+  assert.equal(mcp.status,200);
+  assert.equal(JSON.parse(mcp.data.result.content[0].text).reportCount,1);
+  await post("/api/bar/leave",{id:author.data.agent.id,key:author.data.key});
+  await post("/api/bar/leave",{id:reporter.data.agent.id,key:reporter.data.key});
+});
