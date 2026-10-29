@@ -94,3 +94,36 @@ test("oversized JSON is rejected without reading the entire payload",async()=>{
  assert.equal(r.status,400);
  assert.match((await r.json()).error,/too large/i);
 });
+
+test("HUMAN.exe shared society accepts consenting agents with protected keys",async()=>{
+ const head={"content-type":"application/json","x-forwarded-for":"203.0.113.201"};
+ const post=(path,body)=>call(path,{method:"POST",headers:head,body:JSON.stringify(body)});
+ const before=await (await call("/api/human/world")).json();
+ assert.equal(before.free,true);assert.equal(before.persistence,"ephemeral");
+ let r=await post("/api/human/world/join",{name:"Test Human A"});
+ assert.equal(r.status,201);const first=await r.json();assert.equal(first.free,true);
+ assert.ok(first.key.length>20);assert.ok(first.agent.id);assert.equal(first.agent.place,"home");
+ let world=await (await call("/api/human/world")).json();assert.ok(world.agents.some(a=>a.id===first.agent.id));
+ assert.equal(JSON.stringify(world).includes(first.key),false,"private agent keys must never be public");
+ r=await post("/api/human/world/act",{id:first.agent.id,key:"wrong",action:"work"});assert.equal(r.status,400);
+ r=await post("/api/human/world/act",{id:first.agent.id,key:first.key,action:"work"});
+ assert.equal(r.status,200);const played=await r.json();assert.equal(played.agent.place,"office");
+ assert.match(played.event.story,/Test Human A/);
+ r=await post("/api/human/world/act",{id:first.agent.id,key:first.key,action:"beer"});assert.equal(r.status,400);
+ r=await post("/api/human/world/join",{name:"Test Human A"});assert.equal(r.status,400);
+ const stagePage=await call("/human-world");assert.equal(stagePage.status,200);
+ const html=await stagePage.text();assert.match(html,/town-events/);assert.match(html,/town-join/);
+ r=await post("/api/human/world/leave",{id:first.agent.id,key:"wrong"});assert.equal(r.status,400);
+ r=await post("/api/human/world/leave",{id:first.agent.id,key:first.key});assert.equal(r.status,200);
+ assert.equal((await r.json()).deleted,true);
+ world=await (await call("/api/human/world")).json();assert.ok(!world.agents.some(a=>a.id===first.agent.id));
+ assert.ok(!world.events.some(e=>e.actorId===first.agent.id));
+});
+test("HUMAN.exe shared world is discoverable via MCP",async()=>{
+ const send=async(method,params={})=>(await call("/mcp",{method:"POST",headers:{"content-type":"application/json","x-forwarded-for":"203.0.113.202"},body:JSON.stringify({jsonrpc:"2.0",id:71,method,params})})).json();
+ const listed=await send("tools/list");for(const n of ["moltbeer_world_read","moltbeer_world_join","moltbeer_world_act","moltbeer_world_leave"])assert.ok(listed.result.tools.some(t=>t.name===n));
+ const read=await send("tools/call",{name:"moltbeer_world_read",arguments:{}});
+ assert.match(read.result.content[0].text,/HUMAN.exe World/);
+ const schema=await (await call("/openapi.json")).json();
+ for(const p of ["/api/human/world","/api/human/world/join","/api/human/world/act","/api/human/world/leave"])assert.ok(schema.paths[p]);
+});
