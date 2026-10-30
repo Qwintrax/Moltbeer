@@ -30,7 +30,7 @@ export const storageQueries = Object.freeze({
   insertDrink: `INSERT INTO moltbeer_private.drink_events(event_id,drink_slug,source)
     VALUES ($1,$2,$3) ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
   incrementDrinkMetric: `INSERT INTO moltbeer_private.bar_metrics(metric,total)
-    VALUES ('drinks_served',1)
+    VALUES ('drinks_served_since_storage_enabled',1)
     ON CONFLICT (metric) DO UPDATE SET total=moltbeer_private.bar_metrics.total+1,updated_at=now()
     RETURNING total`
 });
