@@ -10,13 +10,22 @@ import {purgeExpiredBarRows} from './bar-storage-cleanup.mjs';
 import {assertDurableWriteCapacity} from './bar-storage-quotas.mjs';
 
 export const durableModeEnabled = (env=process.env) => env.MOLTBEER_STORAGE_MODE === 'durable';
-let poolPromise;
+let poolPromise,retryAfter=0;
 export async function getDurablePool(){
  if(!durableModeEnabled()) throw Error('Durable mode disabled');
- if(!poolPromise)poolPromise=(async()=>{
-  const {Pool}=await import('pg');
-  return createPrivateDatabasePool({PoolClass:Pool,databaseUrl:process.env.DATABASE_URL});
- })();
+ // A transient auth/network outage must not poison the pool promise until
+ // the next Railway restart. Retry with a short throttle, never expose errors.
+ if(!poolPromise){
+  if(Date.now()<retryAfter)throw Error('Durable storage temporarily unavailable');
+  poolPromise=(async()=>{
+   const {Pool}=await import('pg');
+   return createPrivateDatabasePool({PoolClass:Pool,databaseUrl:process.env.DATABASE_URL});
+  })().catch(()=>{
+   poolPromise=null;
+   retryAfter=Date.now()+5000;
+   throw Error('Durable storage temporarily unavailable');
+  });
+ }
  return poolPromise;
 }
 export function publicDurableError(err){
