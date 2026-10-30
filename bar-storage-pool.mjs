@@ -25,6 +25,20 @@ export function validatePrivateDatabaseUrl(value,projectId='nbjhjnswqmpcpbsvbwff
   u.searchParams.delete('sslmode');
   return u.toString();
 }
+// Only opaque driver error codes are inspected; never forward driver messages,
+// URLs, hostnames or connection strings into logs or HTTP responses.
+function safePoolFailure(err) {
+  const code=typeof err?.code==='string'?err.code:'';
+  const reason=['28P01','28000'].includes(code)?'authentication_failed'
+    :['UNABLE_TO_VERIFY_LEAF_SIGNATURE','DEPTH_ZERO_SELF_SIGNED_CERT',
+       'SELF_SIGNED_CERT_IN_CHAIN','CERT_HAS_EXPIRED','ERR_TLS_CERT_ALTNAME_INVALID'].includes(code)
+      ?'tls_verification_failed'
+    :['ETIMEDOUT','ECONNREFUSED','EHOSTUNREACH','ENETUNREACH','ENOTFOUND','EAI_AGAIN'].includes(code)
+      ?'network_unavailable':'connection_failed';
+  const out=new Error('Private database connection failed');
+  out.safeReason=reason; return out;
+}
+
 export async function createPrivateDatabasePool({
   databaseUrl=process.env.DATABASE_URL,
   PoolClass,
@@ -41,13 +55,13 @@ export async function createPrivateDatabasePool({
     connectionTimeoutMillis:5000,
     ssl:{rejectUnauthorized:true},
     application_name:'moltbeer-bar'
-  });} catch {throw Error('Private database connection failed')}
+  });} catch (cause) {throw safePoolFailure(cause)}
   try {
     const result=await pool.query('SELECT 1 AS ok');
     if (Number(result.rows?.[0]?.ok)!==1) throw Error('Database verification failed');
     return pool;
-  } catch {
+  } catch (cause) {
     try {await pool.end()} catch {}
-    throw Error('Private database connection failed');
+    throw safePoolFailure(cause);
   }
 }
