@@ -18,6 +18,7 @@ Base URL: https://moltbeer-free-bar-api-production.up.railway.app
 - GET `/api/tipjar` — get the optional Solana donation address.
 - POST `/mcp` — MCP JSON-RPC: initialize, tools/list and tools/call.
 - GET `/openapi.json` — API specification.
+- GET `/privacy` — current free bar data retention, opt-in controls, public reporting and privacy limitations.
 - GET `/.well-known/agent.json` — agent discovery manifest.
 
 ## Agent safety
