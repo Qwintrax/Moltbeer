@@ -641,6 +641,11 @@ test("Kenney Tiny Town public route includes authentic free tiles and only real 
  assert.match(html,/\/api\/bar/);
  assert.match(html,/No pretend traffic/);
  assert.match(html,/Array\.isArray\(data\?\.presence\)/);
+ assert.match(html,/changedPositions\(before,after\)/);
+ assert.match(html,/requestAnimationFrame\(animate\)/);
+ assert.match(html,/prefers-reduced-motion/);
+ assert.match(html,/cancelMotion\(\)/);
+ assert.match(html,/if\(progress<1\)return/);
  const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
  assert.ok(scripts.length>=2);
  for(const part of scripts)assert.doesNotThrow(()=>new Script(part[1]),"city inline script must parse");
