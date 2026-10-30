@@ -1,0 +1,21 @@
+// Railway IaC migration candidate for MOLTBEER, 2026-10-30.
+// DO NOT APPLY before running `railway config pull` and `railway config plan`
+// against the *existing* project/environment; verify no new paid resources,
+// changed replicas, domains, auto-sleep settings, or replaced service IDs.
+// This file alone does NOT activate IaC or remove existing railway.json.
+import { defineRailway, project, service } from "railway/iac";
+
+export default defineRailway(() => {
+  const bar = service("moltbeer-free-bar-api", {
+    // The source GitHub repo and existing single-region/sleep policy
+    // remain managed by the existing Railway service during migration.
+    build: "npm test",
+    start: "npm start",
+    healthcheck: "/health",
+    healthcheckTimeout: 60,
+  });
+
+  return project("Moltbeer", {
+    resources: [bar],
+  });
+});
