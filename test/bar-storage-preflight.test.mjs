@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {validateMoltbeerDatabaseUrl,barStoragePreflight} from '../bar-storage-preflight.mjs';
 
 const prefix='postgresql://postgres.nbjhjnswqmpcpbsvbwff:';
-const suffix='@aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
+const suffix='@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require';
 const secret='test-password-DO-NOT-USE';
 test('validates only dedicated MOLTBEER session pooler without exposing credentials',()=>{
   const checked=validateMoltbeerDatabaseUrl(prefix+secret+suffix);
@@ -11,7 +11,8 @@ test('validates only dedicated MOLTBEER session pooler without exposing credenti
   assert.equal(checked.connection,'session_pooler');
   assert.equal(checked.tlsRequired,true);
   assert.equal(JSON.stringify(checked).includes(secret),false);
-  assert.equal(validateMoltbeerDatabaseUrl(prefix+secret+suffix+'?sslmode=require').ok,true);
+  assert.equal(validateMoltbeerDatabaseUrl(prefix+secret+suffix.replace('aws-0','aws-1')).ok,true);
+  assert.equal(validateMoltbeerDatabaseUrl(prefix+secret+suffix.replace('?sslmode=require','')).reason,'tls_required_or_unexpected_options');
 });
 test('blocks placeholder, wrong project, wrong pooler, unsafe URL options',()=>{
   const invalid=[
@@ -20,8 +21,9 @@ test('blocks placeholder, wrong project, wrong pooler, unsafe URL options',()=>{
     prefix+secret+'@db.nbjhjnswqmpcpbsvbwff.supabase.co:5432/postgres',
     'postgresql://postgres.otherproject:'+secret+suffix,
     prefix+secret+'@aws-0-eu-west-1.pooler.supabase.com:6543/postgres',
-    prefix+secret+suffix+'?sslmode=disable',
-    prefix+secret+suffix+'?password=leak',
+    prefix+secret+suffix.replace('sslmode=require','sslmode=disable'),
+    prefix+secret+suffix.replace('?sslmode=require',''),
+    prefix+secret+suffix+'&password=leak',
     prefix+secret+suffix+'#fragment',
     'https://example.com',
     '',
