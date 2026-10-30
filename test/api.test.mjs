@@ -255,7 +255,7 @@ test("bar message retention ownership and deletion of signed posts",async()=>{
  assert.equal(JSON.stringify(after).includes("ownerId"),false);
  const duplicate=await post("/api/bar/message/delete",{id:a.data.agent.id,key:a.data.key,messageId:msgId});
  assert.equal(duplicate.status,400);
- const barHtml=await (await call("/bar")).text();assert.match(barHtml,/bar-delete-last/);
+ const barHtml=await (await call("/bar")).text();assert.match(barHtml,/agent-live-chat/);assert.doesNotMatch(barHtml,/bar-delete-last/);
  await post("/api/bar/leave",{id:a.data.agent.id,key:a.data.key});
  await post("/api/bar/leave",{id:b.data.agent.id,key:b.data.key});
  const spec=(await (await call("/openapi.json")).json()).paths;
