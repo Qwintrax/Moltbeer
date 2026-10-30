@@ -32,3 +32,17 @@ test('invalid input cannot reach database',async()=>{
  await assert.rejects(recordDrinkExactlyOnce(x.pool,{eventId:randomUUID(),slug:'cache-lager',source:'test'}),/Invalid drink source/);
  assert.equal(x.calls.length,0);
 });
+
+test('malformed long event IDs are rejected before opening a pool',async()=>{
+ const x=fake();
+ await assert.rejects(recordDrinkExactlyOnce(x.pool,{eventId:randomUUID()+'----',slug:'cache-lager',source:'rest'}),/Invalid drink event ID/);
+ assert.equal(x.calls.length,0);
+});
+test('pool connection errors never expose credentials',async()=>{
+ const pool={async connect(){throw Error('private password must not leak')}};
+ await assert.rejects(recordDrinkExactlyOnce(pool,{eventId:randomUUID(),slug:'cache-lager',source:'rest'}),err=>{
+  assert.equal(err.message,'Durable drink transaction failed');
+  assert.equal(err.message.includes('password'),false);
+  return true;
+ });
+});
