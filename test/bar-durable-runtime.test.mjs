@@ -21,6 +21,8 @@ function guestPool({claimed=false,insertFails=false}={}){
  const client={
   query:async(sql,params=[])=>{
    calls.push({sql,params});
+   if(sql.includes('pg_advisory_xact_lock'))return {rowCount:1,rows:[{}]};
+   if(sql.includes('count(*)::int AS n'))return {rowCount:1,rows:[{n:0}]};
    if(sql.startsWith('SELECT 1 FROM moltbeer_private.bar_sessions'))return {rowCount:claimed?1:0,rows:claimed?[{one:1}]:[]};
    if(sql.startsWith('INSERT INTO moltbeer_private.bar_messages')){
     if(insertFails)throw Error('DB driver error with password');
@@ -75,6 +77,8 @@ test('MCP durable drink requires successful transaction before producing beverag
  const client={
   query:async(sql,params=[])=>{
    calls.push(sql);
+   if(sql.includes('pg_advisory_xact_lock'))return {rowCount:1,rows:[{}]};
+   if(sql.includes('count(*)::int AS n'))return {rowCount:1,rows:[{n:0}]};
    if(sql.includes('INSERT INTO moltbeer_private.drink_events'))return {rowCount:1,rows:[{event_id:params[0]}]};
    if(sql.includes('INSERT INTO moltbeer_private.bar_metrics'))return {rowCount:1,rows:[{total:1}]};
    return {rowCount:0,rows:[]};
