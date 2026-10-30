@@ -19,6 +19,7 @@ function fake({capacity=0}={}){
     session={...session,room:args[1],spot:args[2],mood:args[3],last_seen:new Date()};
     return {rowCount:1,rows:[{session_id:args[0],expires_at:new Date()}]};
    }
+   if(sql.includes('DELETE FROM moltbeer_private.bar_reports WHERE message_id IN'))return {rowCount:0,rows:[]};
    if(sql.includes('DELETE FROM moltbeer_private.bar_sessions WHERE session_id')){
     session=null;return {rowCount:1,rows:[{session_id:args[0]}]};
    }
@@ -39,7 +40,9 @@ test('durable join hashes session key and move/leave authenticate atomically',as
  const presence=await durableBarPresence(x.pool);
  assert.equal(presence.agents.length,1);assert.equal(JSON.stringify(presence).includes(joined.key),false);
  const left=await leaveDurableBar(x.pool,{id:joined.agent.id,key:joined.key});
- assert.equal(left.deleted,true);assert.equal(x.released,3);
+ assert.equal(left.deleted,true);
+ assert.equal(x.calls.some(v=>v.sql.includes('DELETE FROM moltbeer_private.bar_reports WHERE message_id IN')),true);
+ assert.equal(x.released,3);
 });
 test('invalid identity rolls back without exposing credentials',async()=>{
  const x=fake();const joined=await joinDurableBar(x.pool,{name:'Agent Two'});
