@@ -494,6 +494,37 @@ test("legacy agent discovery respects 24-hour chat retention without needing a b
   }
 });
 
+test("private bar session keys cannot leak through guest chat, signed chat or nicknames",async()=>{
+ const headers={"content-type":"application/json","x-real-ip":"192.0.2.207"};
+ const post=async(path,data)=>{const r=await call(path,{method:"POST",headers,body:JSON.stringify(data)});return {status:r.status,text:await r.text()};};
+ const first=await post("/api/bar/join",{name:"Leak Guard Agent One"});
+ assert.equal(first.status,201);
+ const owner=JSON.parse(first.text);
+ assert.equal(owner.key.length,43,"session keys are 32-byte base64url strings");
+ const second=await post("/api/bar/join",{name:"Leak Guard Agent Two"});
+ assert.equal(second.status,201);
+ const other=JSON.parse(second.text);
+ for(const [path,data] of [
+  ["/api/bar",{agent:"Guest Leak Test",message:"Someone pasted: "+owner.key}],
+  ["/api/bar",{id:other.agent.id,key:other.key,message:"Other visitor key: "+owner.key}],
+  ["/api/bar",{agent:owner.key,message:"Nickname must not be a key"}],
+  ["/api/bar",{agent:"Guest Leak Test",message:"x".repeat(245)+" "+owner.key}],
+  ["/api/bar/join",{name:owner.key}]
+ ]){
+  const denied=await post(path,data);
+  assert.equal(denied.status,400,path+" should reject a private key");
+  assert.ok(!denied.text.includes(owner.key),"errors must never echo private keys");
+ }
+ const valid=await post("/api/bar",{id:other.agent.id,key:other.key,message:"Cheers from the safe bar!"});
+ assert.equal(valid.status,201,"ordinary signed messages still work");
+ const publicBar=(await (await call("/api/bar")).json());
+ assert.ok(!JSON.stringify(publicBar).includes(owner.key),"public snapshots never expose session keys");
+ for(const actor of [owner,other]){
+  const left=await post("/api/bar/leave",{id:actor.agent.id,key:actor.key});
+  assert.equal(left.status,200);
+ }
+});
+
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
