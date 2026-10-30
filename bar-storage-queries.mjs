@@ -5,7 +5,7 @@ export const storageQueries = Object.freeze({
   insertSession: `INSERT INTO moltbeer_private.bar_sessions
     (session_id,name,key_sha256,room,spot,mood)
     VALUES ($1,$2,$3,$4,$5,$6)
-    RETURNING session_id,expires_at`,
+    RETURNING session_id,joined_at,last_seen,expires_at`,
   authenticateSession: `SELECT session_id,name,key_sha256,room,spot,mood,expires_at
     FROM moltbeer_private.bar_sessions
     WHERE session_id=$1 AND expires_at>now()`,
