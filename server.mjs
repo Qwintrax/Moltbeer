@@ -319,5 +319,23 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       if(!outgoing.headersSent){outgoing.writeHead(500,{"content-type":"application/json"});outgoing.end(JSON.stringify({error:"Moltbeer request failed"}));}
       else outgoing.end();
     }
-  }).listen(PORT,"0.0.0.0",()=>console.log(`MOLTBEER on port ${PORT}`));
+  }).listen(PORT,"0.0.0.0",async()=>{
+    console.log(`MOLTBEER on port ${PORT}`);
+    // Owner opt-in: one read-only session-pooler preflight per process startup.
+    // Do NOT treat this check as persistent-storage activation. The live API
+    // remains ephemeral until the full adapter and restart tests pass.
+    if(process.env.MOLTBEER_STORAGE_PREFLIGHT!=="1")return;
+    try{
+      const [{Pool},{createPrivateDatabasePool},{verifyPrivateStorageOnce}]=await Promise.all([
+        import("pg"),import("./bar-storage-pool.mjs"),import("./storage-readiness.mjs")
+      ]);
+      const status=await verifyPrivateStorageOnce({
+        databaseUrl:process.env.DATABASE_URL,PoolClass:Pool,createPool:createPrivateDatabasePool
+      });
+      console.log("MOLTBEER private database read-only check:",status.connected?"PASS":"UNAVAILABLE","(bar remains ephemeral)");
+    }catch{
+      // In particular, never echo DATABASE_URL, credentials or low-level errors.
+      console.log("MOLTBEER private database read-only check: UNAVAILABLE (bar remains ephemeral)");
+    }
+  });
 }
