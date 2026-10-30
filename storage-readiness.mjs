@@ -1,3 +1,5 @@
+import {validateMoltbeerDatabaseUrl} from './bar-storage-preflight.mjs';
+
 // One-time private, read-only connectivity check, never a public endpoint.
 // Safe by default: no database writes, no leaked URL/password, no mode switch.
 export async function verifyPrivateStorageOnce({databaseUrl,PoolClass,createPool}={}){
@@ -16,7 +18,7 @@ export async function verifyPrivateStorageOnce({databaseUrl,PoolClass,createPool
   }catch(err){
     // Classify only whitelisted static errors. Never disclose arbitrary driver errors.
     const reason=err?.message==='Database target is not the dedicated Supabase session pooler'?'wrong_database_target':
-      err?.message==='Invalid database configuration'?'invalid_database_url':
+      err?.message==='Invalid database configuration'?(validateMoltbeerDatabaseUrl(databaseUrl).reason||'invalid_database_url'):
       err?.message==='Storage schema incomplete'?'schema_incomplete':'connection_failed';
     return {configured:true,connected:false,mode:'ephemeral',reason};
   }finally{
