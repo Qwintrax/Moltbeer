@@ -8,7 +8,9 @@ test('accepts only dedicated TLS-enabled Supabase pooler',()=>{
   'postgresql://postgres.other:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres',
   'postgresql://postgres.nbjhjnswqmpcpbsvbwff:pw@evil.example:5432/postgres',
   target.replace(':5432/',':6543/'),
-  target.replace('sslmode=require','sslmode=disable')
+  target.replace('sslmode=require','sslmode=disable'),
+  target.replace('?sslmode=require',''),
+  target.replace('eu-west-1','us-east-1')
  ]) assert.throws(()=>validatePrivateDatabaseUrl(value));
 });
 test('creates bounded pool and checks database before returning',async()=>{
