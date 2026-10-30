@@ -5,6 +5,9 @@
     "buildCommand": "npm test",
     "watchPatterns": [
       "/*.mjs",
+      "/scripts/**",
+      "/certs/**",
+      "/assets/**",
       "/package.json",
       "/railway.json",
       "/merch.json",
