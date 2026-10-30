@@ -104,11 +104,11 @@ export async function verifyDurableStorageRollback(pool){
   assert.ok(!(await durableBarPresence(scoped)).agents.some(a=>a.id===first.agent.id));
   step='rollback';
   await client.query('ROLLBACK');outer=false;
-  const [sessionRow,eventRow,guestRow]=await Promise.all([
-   client.query('SELECT 1 FROM moltbeer_private.bar_sessions WHERE session_id=$1',[sessionId]),
-   client.query('SELECT 1 FROM moltbeer_private.drink_events WHERE event_id=$1',[eventId]),
-   client.query('SELECT 1 FROM moltbeer_private.bar_messages WHERE message_id=$1',[guestMessageId])
-  ]);
+  // The same dedicated client must not execute concurrent queries: pg 8
+  // warns about this and pg 9 will reject it. Check sequentially.
+  const sessionRow=await client.query('SELECT 1 FROM moltbeer_private.bar_sessions WHERE session_id=$1',[sessionId]);
+  const eventRow=await client.query('SELECT 1 FROM moltbeer_private.drink_events WHERE event_id=$1',[eventId]);
+  const guestRow=await client.query('SELECT 1 FROM moltbeer_private.bar_messages WHERE message_id=$1',[guestMessageId]);
   assert.equal(sessionRow.rowCount,0);
   assert.equal(eventRow.rowCount,0);
   assert.equal(guestRow.rowCount,0);
