@@ -73,8 +73,8 @@ export async function moveDurableBar(pool,{id,key,room,spot,mood}={}){
   const a=await verified(client,{id,key});
   const result=await client.query(storageQueries.updatePresence,[id,room??a.room,spot??a.spot,mood??a.mood]);
   if(result.rowCount!==1)invalidIdentity();
-  const now=new Date().toISOString();
-  return {ok:true,free:true,agent:profile({...a,room:room??a.room,spot:spot??a.spot,mood:mood??a.mood,last_seen:now})};
+  if(!result.rows?.[0]?.last_seen)throw Error('Session timestamp unavailable');
+  return {ok:true,free:true,agent:profile({...a,room:room??a.room,spot:spot??a.spot,mood:mood??a.mood,last_seen:result.rows[0].last_seen})};
  });
 }
 export async function heartbeatDurableBar(pool,{id,key}={}){
