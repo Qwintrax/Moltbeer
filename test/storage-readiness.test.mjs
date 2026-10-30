@@ -31,3 +31,26 @@ test('private storage verification never switches bar to durable mode or exposes
  assert.equal(JSON.stringify(invalid).includes('secret'),false);
  assert.equal(ended,3);
 });
+
+test('preflight categorizes invalid URL safely without exposing a credential',async()=>{
+ const prefix='postgresql://postgres.nbjhjnswqmpcpbsvbwff:';
+ const suffix='@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require';
+ const secret='example-PRIVATE-test-password';
+ class Pool{}
+ const createPool=async()=>{throw Error('Invalid database configuration')};
+ const cases=[
+  [prefix+'[YOUR-PASSWORD]'+suffix,'missing_password'],
+  [prefix+secret+suffix.replace('sslmode=require','sslmode=disable'),'tls_required_or_unexpected_options'],
+  [prefix+secret+suffix.replace('aws-0-eu-west-1','aws-0-us-east-1'),'wrong_project_or_pooler'],
+  [prefix+secret+suffix+'&extra=1','tls_required_or_unexpected_options'],
+  ['not a database URL','malformed']
+ ];
+ for(const [databaseUrl,expected] of cases){
+  const status=await verifyPrivateStorageOnce({databaseUrl,PoolClass:Pool,createPool});
+  assert.equal(status.connected,false);
+  assert.equal(status.mode,'ephemeral');
+  assert.equal(status.reason,expected);
+  assert.equal(JSON.stringify(status).includes(secret),false);
+  assert.equal(JSON.stringify(status).includes('postgresql://'),false);
+ }
+});
