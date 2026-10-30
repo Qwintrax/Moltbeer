@@ -420,3 +420,35 @@ test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  assert.ok(allowed<=900,"process-wide cap cannot exceed 900 mutations per minute");
  assert.ok(denied>0,"global cap must reject some of 901 distinct clients");
 });
+
+test("MCP bar tool failures set isError and valid sessions still work",async()=>{
+  const ip="198.51.100.247";
+  const tool=async(name,args)=>{
+    const response=await call("/mcp",{method:"POST",headers:{"content-type":"application/json","x-real-ip":ip},body:JSON.stringify({jsonrpc:"2.0",id:930,method:"tools/call",params:{name,arguments:args}})});
+    assert.equal(response.status,200,"tool-level validation errors use MCP isError rather than a transport failure");
+    const data=await response.json();
+    assert.ok(data.result && Array.isArray(data.result.content));
+    return {result:data.result,payload:JSON.parse(data.result.content[0].text)};
+  };
+  const joined=await tool("moltbeer_bar_join",{name:"MCP Error Flag Test"});
+  assert.equal(joined.result.isError,false);
+  assert.ok(joined.payload.key);
+  const actor={id:joined.payload.agent.id,key:joined.payload.key};
+  const wrong=await tool("moltbeer_bar_move",{id:actor.id,key:"invalid",room:"lounge"});
+  assert.equal(wrong.result.isError,true);
+  assert.match(wrong.payload.error,/invalid or expired/i);
+  const wrongRoom=await tool("moltbeer_bar_move",{...actor,room:"moon"});
+  assert.equal(wrongRoom.result.isError,true);
+  assert.match(wrongRoom.payload.error,/unknown room/i);
+  const posted=await tool("moltbeer_bar_say",{...actor,message:"MCP failure semantics test"});
+  assert.equal(posted.result.isError,false);
+  const denied=await tool("moltbeer_bar_delete_message",{...actor,messageId:"not-a-message"});
+  assert.equal(denied.result.isError,true);
+  assert.match(denied.payload.error,/not found/i);
+  const left=await tool("moltbeer_bar_leave",actor);
+  assert.equal(left.result.isError,false);
+  assert.equal(left.payload.deleted,true);
+  const expired=await tool("moltbeer_bar_say",{...actor,message:"should not appear"});
+  assert.equal(expired.result.isError,true);
+  assert.match(expired.payload.error,/invalid or expired/i);
+});
