@@ -630,6 +630,25 @@ test("bar interior live visuals are valid browser JS, data-driven and free",asyn
  const map=await (await call("/sitemap.xml")).text();
  assert.match(map,/\/bar-room/);
 });
+test("Kenney Tiny Town public route includes authentic free tiles and only real agents",async()=>{
+ const response=await call("/city");assert.equal(response.status,200);
+ const html=await response.text();
+ assert.match(html,/Kenney Tiny Town/);
+ assert.match(html,/id="tiny-town-map"/);
+ assert.match(html,/kenney-tiny-town-selected\.webp/);
+ assert.match(html,/imageSmoothingEnabled=false/);
+ assert.match(html,/document.hidden/);
+ assert.match(html,/\/api\/bar/);
+ assert.match(html,/No pretend traffic/);
+ assert.match(html,/Array\.isArray\(data\?\.presence\)/);
+ const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+ assert.ok(scripts.length>=2);
+ for(const part of scripts)assert.doesNotThrow(()=>new Script(part[1]),"city inline script must parse");
+ const index=(await (await call("/bar")).text());
+ assert.match(index,/\/city/);
+ const sitemap=await (await call("/sitemap.xml")).text();
+ assert.match(sitemap,/\/city/);
+});
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
