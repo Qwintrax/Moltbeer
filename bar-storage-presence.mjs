@@ -59,7 +59,9 @@ export async function joinDurableBar(pool,{name,room='counter'}={}){
   const hash=createHash('sha256').update(key).digest('hex');
   const inserted=await client.query(storageQueries.insertSession,[id,name,hash,room,'entrance','chill']);
   if(inserted.rowCount!==1)throw Error('insert failed');
-  const now=new Date().toISOString();
+  const timestamp=inserted.rows?.[0]?.joined_at;
+  if(!timestamp)throw Error('Session timestamp unavailable');
+  const now=new Date(timestamp).toISOString();
   return {ok:true,free:true,key,agent:{id,name,room,spot:'entrance',mood:'chill',joinedAt:now,lastSeen:now,verified:'session-key-only'}};
  });
 }
