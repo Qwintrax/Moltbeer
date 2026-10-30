@@ -654,6 +654,16 @@ test("Kenney Tiny Town public route includes authentic free tiles and only real 
  const sitemap=await (await call("/sitemap.xml")).text();
  assert.match(sitemap,/\/city/);
 });
+test("public HTML and JSON have privacy/security headers without capturing device permissions",async()=>{
+ for(const path of ["/privacy","/bar","/api/bar","/api/stats"]){
+  const r=await call(path);
+  assert.equal(r.status,200);
+  assert.equal(r.headers.get("x-content-type-options"),"nosniff");
+  assert.equal(r.headers.get("referrer-policy"),"no-referrer");
+  assert.equal(r.headers.get("permissions-policy"),"geolocation=(),camera=(),microphone=()");
+  assert.equal(r.headers.get("cache-control"),"no-store");
+ }
+});
 test("privacy page discloses actual ephemeral retention, rights and no imaginary database",async()=>{
  const r=await call("/privacy");assert.equal(r.status,200);
  const html=await r.text();
