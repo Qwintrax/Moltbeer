@@ -17,9 +17,13 @@ export async function verifyPrivateStorageOnce({databaseUrl,PoolClass,createPool
     return {configured:true,connected:true,mode:'ephemeral',reason:'ok'};
   }catch(err){
     // Classify only whitelisted static errors. Never disclose arbitrary driver errors.
-    const reason=err?.message==='Database target is not the dedicated Supabase session pooler'?'wrong_database_target':
-      err?.message==='Invalid database configuration'?(validateMoltbeerDatabaseUrl(databaseUrl).reason||'invalid_database_url'):
-      err?.message==='Storage schema incomplete'?'schema_incomplete':'connection_failed';
+    const configurationError=err?.message==='Database target is not the dedicated Supabase session pooler'||
+      err?.message==='Invalid database configuration';
+    // Both pool validation errors can represent a malformed URL. Reclassify
+    // with the same allowlisted, credential-free validator used by preflight.
+    const reason=configurationError
+      ? (validateMoltbeerDatabaseUrl(databaseUrl).reason||'invalid_database_url')
+      : err?.message==='Storage schema incomplete'?'schema_incomplete':'connection_failed';
     return {configured:true,connected:false,mode:'ephemeral',reason};
   }finally{
     if(pool)try{await pool.end()}catch{}
