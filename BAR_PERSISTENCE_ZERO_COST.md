@@ -37,6 +37,17 @@ Updated 2026-10-30 (15:50 CET). **Dedicated Supabase Free project and private sc
 - `bar_moderation_audit` has a 30-day `expires_at` timestamp but still needs actual cleanup. All RLS/private-schema protections remain; security advisor reports only six expected INFO items for no public policies.
 - **Important:** no app writes into these prepared tables yet, and expiry fields do not automatically delete rows. The live bar remains ephemeral.
 
+## Real Railway-to-Supabase preflight — 2026-10-30, verified
+
+- Tested Railway's already configured `DATABASE_URL` with production startup `MOLTBEER_STORAGE_PREFLIGHT=1`. This opens at most one read-only connection per process start and never activates durable writes.
+- Main contains tested private storage adapters from merged [PR #12](https://github.com/Qwintrax/Moltbeer/pull/12), merge commit `e25d59a`, and a testable read-only startup probe, commits `4b81574`, `ae29285`, `0a47b64`, `33878a0`.
+- Railway deployment `4b86225e-f907-49ac-8af9-04392b3e1f31` **SUCCESS**, `81/81` Node tests passed, healthcheck passed.
+- **Actual log:** `MOLTBEER private database read-only check: UNAVAILABLE invalid_database_url (bar remains ephemeral)`. No raw credentials or host details were logged. This is a validation/placeholder/URL-format failure, NOT proof that the Supabase database is down.
+- Fix privately in the existing Railway service's Variables section: replace `DATABASE_URL` with the **dedicated MOLTBEER Supabase Session pooler** full PostgreSQL connection string from the Supabase project's **Connect → Session pooler** panel, including the *real* password. Expected target: `postgres.nbjhjnswqmpcpbsvbwff` user, `aws-[N]-eu-west-1.pooler.supabase.com`, port `5432`, database `postgres`, `sslmode=require`. If the password contains reserved URI characters, percent-encode them correctly or use Supabase's provided generated URL. Never paste a password into chat or GitHub.
+- After Railway redeploys, inspect **only the sanitized** startup status; require `PASS ok` before any write activation. Even PASS verifies only read-only connection, not safe durable chat/transaction/restart behavior.
+- Admin moderation `MOLTBEER_ADMIN_TOKEN` remains unset; an attempted automated secret transfer was blocked by security controls. Owner must configure a separate strong secret privately in Railway Variables. No workaround or default admin secret.
+- These checks added no new paid service, subscription, database or volume. **Railway bill/absolute 0-kr hard cap still unverified**.
+
 ## Implementation acceptance gates
 - [x] Confirm dedicated MOLTBEER Supabase project and owner org on the existing Free plan. **DATABASE_URL exists in Railway production**, but the running code is not connected to the database and no Railway DB roundtrip is verified.
 - [x] Supabase migrations applied and verified: 20261030051605 moltbeer_private_initial_storage, 20261030102021 moltbeer_private_bar_sessions_chat_metrics, and 20261030111915 bar_private_reporting_indexes_expiry. Six tables in private moltbeer_private schema, RLS enabled, zero rows; no broad client policies/grants. Security advisor reports 6 INFO RLS-without-policy notices, intentional for private backend data. [Reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
