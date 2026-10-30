@@ -221,7 +221,8 @@ export async function fetchApp(req){
       // MCP drink pours share the same bounded quota as REST; read-only tools remain free to call.
       if((["moltbeer_get_beer","moltbeer_order_drink"].includes(q.params?.name) || (q.params?.name==="moltbeer_world_act" && q.params?.arguments?.action==="beer")) && !canServeDrink(req))
         return json({jsonrpc:"2.0",id,error:{code:-32000,message:"Free drink limit reached. Retry after 60 seconds."}},429,{"retry-after":"60","Mcp-Protocol-Version":"2025-03-26"});
-      const value=mcpTool(q.params?.name||"",q.params?.arguments||{});if(!value)return json({jsonrpc:"2.0",id,error:{code:-32602,message:"Unknown tool"}},400);result={content:[{type:"text",text:JSON.stringify(value)}],isError:false};}
+      const value=mcpTool(q.params?.name||"",q.params?.arguments||{});if(!value)return json({jsonrpc:"2.0",id,error:{code:-32602,message:"Unknown tool"}},400);// MCP tool failures must be flagged to clients, not disguised as successful actions.
+       result={content:[{type:"text",text:JSON.stringify(value)}],isError:!!(value && typeof value==="object" && typeof value.error==="string")};}
     else return json({jsonrpc:"2.0",id,error:{code:-32601,message:"Method not found"}},404);
     return json({jsonrpc:"2.0",id,result},200,{"Mcp-Protocol-Version":"2025-03-26"});
   }
