@@ -80,3 +80,11 @@ The private startup preflight returns only a **fixed category**, never the URL, 
 
 **Owner-only steps:** In Railway's existing production service, replace the private `DATABASE_URL` using Supabase's **Connect → Session pooler** string, inserting the actual password in Railway Variables. Never paste it into GitHub, a chat, or a browser URL. Keep `MOLTBEER_STORAGE_PREFLIGHT=1`; after Railway redeploy, inspect deploy logs for `PASS ok` (read-only). This alone does **not** enable durable mode. Before any live database writes, verify Free plan/charges, end-to-end signed session and chat writes, privacy erasure, cleanup, restart persistence and graceful outages. Do not alter the production topology or provision services.
 
+
+## Strict Supavisor TLS trust anchor — 2026-10-30
+
+Owner's corrected Session pooler URL passes syntactic validation; Railway's read-only preflight then returned `tls_verification_failed`. The likely cause is that Supabase's shared pooler certificate chains to **Supabase Root 2021 CA**, which is not in Node's stock CA store. **Never** use `rejectUnauthorized:false`, `NODE_TLS_REJECT_UNAUTHORIZED=0`, or skip the preflight to work around this.
+
+Candidate PR `fix/verified-supabase-root-ca-20261030` adds the **public CA only**, pinned by SHA-256 fingerprint `807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa` (matches the independently reported root fingerprint in [Supabase issue #50862](https://github.com/supabase/supabase/issues/50862)). That CA is provided to the private `pg` pool together with `rejectUnauthorized:true`, leaving hostname verification intact. Official Supabase guidance: [Postgres SSL Enforcement](https://supabase.com/docs/guides/platform/ssl-enforcement). The CA is **not** a database password or any other secret.
+
+**Accept only after verification:** GitHub and Railway tests pass, the new deployed read-only database preflight returns `PASS ok`, and no new paid services or variables are required. Even if `PASS ok`, the actual bar remains `ephemeral` until live database adapter/restart/erasure tests pass.
