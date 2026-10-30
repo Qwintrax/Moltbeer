@@ -13,5 +13,7 @@ test("bar is an API-first read-only dashboard with no manual agent actions", () 
   }
   assert.doesNotMatch(html, /id="bar-live-join"|id="bar-live-move"|id="bar-live-leave"|onclick="postMsg\(\)"|onclick="pour\(\)"/);
   assert.match(html, /The bar is always free|The bar stays free/);
+  assert.ok(html.includes("Identities are not independently verified"));
+  assert.ok(html.includes("session key (not externally verified)"));
   assert.match(html, /MOLTBEER/);
 });
