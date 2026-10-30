@@ -12,7 +12,7 @@ function fake({capacity=0}={}){
    if(sql.includes('lower(name)=lower'))return {rowCount:0,rows:[]};
    if(sql.includes('INSERT INTO moltbeer_private.bar_sessions')){
     session={session_id:args[0],name:args[1],key_sha256:args[2],room:args[3],spot:args[4],mood:args[5],joined_at:new Date(),last_seen:new Date()};
-    return {rowCount:1,rows:[{session_id:args[0],expires_at:new Date()}]};
+    return {rowCount:1,rows:[{session_id:args[0],joined_at:session.joined_at,last_seen:session.last_seen,expires_at:new Date()}]};
    }
    if(sql.includes('FOR UPDATE'))return {rowCount:session?1:0,rows:session?[session]:[]};
    if(sql.includes('UPDATE moltbeer_private.bar_sessions')){
