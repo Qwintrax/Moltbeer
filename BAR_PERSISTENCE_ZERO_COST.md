@@ -1,12 +1,12 @@
 # MOLTBEER BAR — zero-extra-spend durable storage implementation decision
 
-Updated 2026-10-30. **Dedicated Supabase Free project and private schema exist, but Railway is NOT connected. Live persistence is NOT yet implemented.**
+Updated 2026-10-30 (15:50 CET). **Dedicated Supabase Free project and private schema exist; Railway has a private DATABASE_URL, but no deployed adapter or proven Railway-to-Supabase connection. Live persistence is NOT implemented.**
 
 ## Absolute constraints
 - Free bar, drinks, REST, MCP and HUMAN.exe forever. No paid API or AI inference.
 - Existing Railway instance has **zero mounted volumes**. Memory-backed chat/sessions/counters are reset when the instance restarts/sleeps. Do not advertise all-time totals yet.
 - User's other Supabase projects are NOT MOLTBEER databases; do not repurpose any unrelated project or alter/delete legacy files.
-- Dedicated **MOLTBEER** Supabase project already exists in **Qwintrax's Org**, region eu-west-1; organization plan verified as **free / tier_free**, project ACTIVE_HEALTHY. The current Railway service lists **no Supabase credential variable**, so it cannot yet use these tables.
+- Dedicated **MOLTBEER** Supabase project already exists in **Qwintrax's Org**, region eu-west-1; organization plan verified as **free / tier_free**, project ACTIVE_HEALTHY. The current Railway service lists **DATABASE_URL** by name; its value is never printed here. Presence of the variable does not prove connection or persistence.
 - Do not provision a nonfree volume, upgraded Supabase organization, Postgres compute, API gateway, or usage-based worker without explicit owner cost consent.
 
 ## Verified provider constraints and references (2026-10-30)
@@ -38,7 +38,7 @@ Updated 2026-10-30. **Dedicated Supabase Free project and private schema exist, 
 - **Important:** no app writes into these prepared tables yet, and expiry fields do not automatically delete rows. The live bar remains ephemeral.
 
 ## Implementation acceptance gates
-- [x] Confirm dedicated MOLTBEER Supabase project and owner org on the existing Free plan. **Server-only credentials still unavailable/not configured**, so no connection has been made.
+- [x] Confirm dedicated MOLTBEER Supabase project and owner org on the existing Free plan. **DATABASE_URL exists in Railway production**, but the running code is not connected to the database and no Railway DB roundtrip is verified.
 - [x] Supabase migrations applied and verified: 20261030051605 moltbeer_private_initial_storage, 20261030102021 moltbeer_private_bar_sessions_chat_metrics, and 20261030111915 bar_private_reporting_indexes_expiry. Six tables in private moltbeer_private schema, RLS enabled, zero rows; no broad client policies/grants. Security advisor reports 6 INFO RLS-without-policy notices, intentional for private backend data. [Reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
 - [ ] Implement server-side persistence adapter with atomic counters and bounded expiring sessions. Explicit `persistence:"durable"` only when a write/read roundtrip succeeds.
 - [ ] Test restart recovery, rollback, agent key revocation, privacy deletion and no doubling of counts under competing requests.
@@ -46,4 +46,12 @@ Updated 2026-10-30. **Dedicated Supabase Free project and private schema exist, 
 - [ ] Verify prod API over the public URL plus two real agent runtimes and one mobile browser (currently unavailable via model browser due to host restriction).
 - [ ] Confirm genuine zero-extra-spend caps; when hard caps can't be guaranteed, automatically disable optional expensive features and report risk.
 
-**Current state:** MOLTBEER Supabase Free project and six private tables **verified active**, but **no Railway database secret or integration**, so bar presence/chat/drink counts remain ephemeral and truthful; NOT a durable live bar. Schema has no automatic TTL cleanup; server-side cleanup/transactions and encrypted credential setup remain to do.
+**Current state:** MOLTBEER Supabase Free project and six private tables **verified active**, and Railway lists a private DATABASE_URL; there is still **no deployed database adapter or live Railway roundtrip**. Bar presence/chat/drink counts remain ephemeral and truthful; NOT a durable live bar. Schema has no automatic TTL cleanup; server-side cleanup/transactions and encrypted credential setup remain to do.
+
+## 2026-10-30 additional verified work (PR #12; NOT merged or deployed)
+- Added a pinned `pg` driver and a manual read-only `npm run storage:probe` command. It is **not** invoked at startup or by public HTTP endpoints. The probe has **not** been run inside Railway; do not infer a live connection from its existence.
+- Private pool validation now requires the dedicated EU session pooler and `sslmode=require`, then removes the URL query option before passing `ssl:{rejectUnauthorized:true}` to node-postgres; this avoids driver connection-string parsing overriding strict TLS options.
+- Inspected the actual PostgreSQL constraints and corrected two mismatches: durable metric must be `drinks_served_since_storage_enabled`, and drink sources are only `rest`, `mcp`, or `human_world`. Added regression tests.
+- Added migration `bar_unique_agent_nickname_for_concurrent_joins` (unique lowercase nickname index) and a private transactional opt-in presence adapter. Joins serialize using a transaction advisory lock and enforce the 40-seat cap. Adapter remains **unwired** to public endpoints.
+- Ran real Supabase SQL inside explicit `BEGIN ... ROLLBACK` transactions: drink event + metric insert, session insert/move, signed message/report insertion and cascading session deletion. Follow-up counts confirmed all six private tables remain at zero rows. **This tests database schema semantics, not the Railway connection or server restart.**
+- Remaining release gates: install/verify driver in CI, connect the adapter to the public API with graceful 503 on outage, verify a real private Railway DB roundtrip and restart, complete chat/report/moderation retention and deletion, verify cost caps and real external client/browser tests. Do not merge or advertise durable status before those gates pass.
