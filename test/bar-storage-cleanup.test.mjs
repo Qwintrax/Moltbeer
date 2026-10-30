@@ -29,3 +29,16 @@ test('cleanup connection failures do not expose database secrets',async()=>{
   return true;
  });
 });
+
+test('retention also removes reports orphaned by expired session cascade',async()=>{
+ const x=fixture();
+ await purgeExpiredBarRows(x.pool);
+ const messageCleanup=x.calls.findIndex(sql=>sql.includes('DELETE FROM moltbeer_private.bar_messages'));
+ const reportCleanup=x.calls.findIndex(sql=>sql.includes('DELETE FROM moltbeer_private.bar_reports'));
+ assert.ok(messageCleanup>=0&&reportCleanup>messageCleanup);
+ const sql=x.calls[reportCleanup];
+ assert.match(sql,/r\.expires_at<=now\(\)/);
+ assert.match(sql,/NOT EXISTS/);
+ assert.match(sql,/m\.message_id::text=r\.message_id/);
+ assert.equal(x.calls.at(-1),'COMMIT');
+});
