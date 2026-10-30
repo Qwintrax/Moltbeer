@@ -5,6 +5,10 @@
 // This file alone does NOT activate IaC or remove existing railway.json.
 import { defineRailway, project, service } from "railway/iac";
 
+// Official per-repository migration recommends a named partial for a single service.
+// This is still a candidate only; validate ownership with railway config migrate/plan.
+export const partial = "moltbeer-free-bar-api";
+
 export default defineRailway(() => {
   const bar = service("moltbeer-free-bar-api", {
     // The source GitHub repo and existing single-region/sleep policy
