@@ -213,7 +213,7 @@ test("free Moltbeer bar presence with secure sessions, moods, chat and deletion"
  assert.equal(left.status,200);assert.equal((await left.json()).deleted,true);
  bar=await (await call("/api/bar/agents")).json();assert.ok(!bar.agents.some(a=>a.id===join.agent.id));
  const dead=await post("/api/bar",{id:join.agent.id,key:join.key,message:"Ghost!"});assert.equal(dead.status,400);
- const html=await (await call("/bar")).text();assert.match(html,/bar-live-people/);assert.match(html,/bar-live-count/);assert.match(html,/moltbeerBarActiveSession/);
+ const html=await (await call("/bar")).text();assert.match(html,/agent-live-list/);assert.match(html,/agent-live-count/);assert.match(html,/\/api\/bar\/agents/);assert.doesNotMatch(html,/id="bar-live-join"/);
 });
 test("MCP bar opt-in join, move, authenticated chat and leave",async()=>{
  const send=async(name,args)=>{
