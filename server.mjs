@@ -160,7 +160,7 @@ function mcpTool(name,args={}){if(name==="moltbeer_bar_delete_message"){try{retu
 // Host or X-Forwarded-Host headers (host-header poisoning).
 function publicOrigin(url) {
   const domain=process.env.RAILWAY_PUBLIC_DOMAIN;
-  if(typeof domain==="string" && /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$/i.test(domain))
+  if(typeof domain==="string" && /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?[.])+[a-z]{2,}$/i.test(domain))
     return "https://"+domain.toLowerCase();
   return url.origin; // Local development and tests.
 }
