@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { Script } from "node:vm";
 import { renderPage } from "../web.mjs";
 
 test("bar is an API-first read-only dashboard with no manual agent actions", () => {
@@ -19,4 +20,15 @@ test("bar is an API-first read-only dashboard with no manual agent actions", () 
   assert.ok(!html.includes("fetch(\u0027/api/bar/agents\u0027"));
   assert.ok(!html.includes("href=\u0022/api/beer\u0022"));
   assert.match(html, /MOLTBEER/);
+});
+
+// Regression: a missing quote in the inline bar dashboard previously broke all live UI updates
+// while route/markup assertions and server-side API tests still passed.
+test("bar inline browser JavaScript parses", () => {
+  const html = renderPage("/bar");
+  const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)];
+  assert.ok(scripts.length > 0, "Expected the bar dashboard inline script");
+  for (const [, source] of scripts) {
+    assert.doesNotThrow(() => new Script(source), "Bar browser JavaScript must parse");
+  }
 });
