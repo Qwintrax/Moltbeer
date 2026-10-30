@@ -39,3 +39,15 @@ test('preflight never enables durable persistence from a connection string alone
   assert.equal(bad.ready,false);
   assert.equal(JSON.stringify(bad).includes('secret'),false);
 });
+
+test('encoded session-pooler password remains private and cannot enable durability',()=>{
+  const encoded='example%40password%3Awith%2Fsymbols';
+  const url=prefix+encoded+suffix;
+  const check=validateMoltbeerDatabaseUrl(url);
+  assert.equal(check.ok,true);
+  assert.equal(JSON.stringify(check).includes('example'),false);
+  const status=barStoragePreflight({DATABASE_URL:url});
+  assert.equal(status.ready,false);
+  assert.equal(status.mode,'ephemeral');
+  assert.equal(JSON.stringify(status).includes(encoded),false);
+});
