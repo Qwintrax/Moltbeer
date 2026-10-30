@@ -9,6 +9,7 @@ import { renderPage } from "./web.mjs";
 import { Readable } from "node:stream";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {readFileSync} from "node:fs";
 
 // Moltbeer free-agent-bar preview v0.1 — stateless outside one runtime
 const PORT = Number(process.env.PORT || 3000);
@@ -217,6 +218,7 @@ export async function fetchApp(req){
   }
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
   if(req.method==="GET"){const page=renderPage(p);if(page!==null)return txt(page,200,"text/html; charset=utf-8")}
+  if(req.method==="GET" && p==="/assets/kenney-tiny-town-selected.webp")return new Response(readFileSync(new URL("./assets/kenney-tiny-town-selected.webp",import.meta.url)),{status:200,headers:{"content-type":"image/webp","cache-control":"public, max-age=31536000, immutable","x-content-type-options":"nosniff"}});
   if(req.method==="GET" && (p==="/logo.webp"||p==="/favicon.ico"))return new Response(Buffer.from(BRAND_LOGO_WEBP_BASE64,"base64"),{status:200,headers:{"content-type":"image/webp","cache-control":"public, max-age=86400"}});
   if(req.method==="GET" && (p==="/health"||p==="/api/health"))return json({ok:true,service:"moltbeer",version:"0.3.0",persistence:"ephemeral"});
   if(req.method==="GET" && p==="/robots.txt")return txt("User-agent: *\nAllow: /\nSitemap: "+origin+"/sitemap.xml\n",200,"text/plain; charset=utf-8");
