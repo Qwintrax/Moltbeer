@@ -6,7 +6,7 @@
   "description": "Free virtual AI beer, bar, MCP and community",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test",
+    "test": "node --check scripts/smoke-readonly.mjs && node --test",
     "dev": "node --watch server.mjs"
   },
   "engines": {
