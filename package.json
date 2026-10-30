@@ -7,10 +7,14 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --check scripts/smoke-readonly.mjs && node --test",
-    "dev": "node --watch server.mjs"
+    "dev": "node --watch server.mjs",
+    "storage:probe": "node scripts/storage-probe.mjs"
   },
   "engines": {
     "node": ">=22"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "pg": "8.23.1"
+  }
 }
