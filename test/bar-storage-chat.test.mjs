@@ -12,6 +12,8 @@ function fixture({failInsert=false,missingMessage=false}={}){
   calls.push({sql,args});
   if(['BEGIN','COMMIT','ROLLBACK'].includes(sql))return {rowCount:0,rows:[]};
   if(sql.includes('FOR UPDATE'))return {rowCount:1,rows:[session]};
+  if(sql.includes('pg_advisory_xact_lock'))return {rowCount:1,rows:[{}]};
+  if(sql.includes('count(*)::int AS n'))return {rowCount:1,rows:[{n:0}]};
   if(sql.includes('UPDATE moltbeer_private.bar_sessions'))return {rowCount:1,rows:[{session_id:id}]};
   if(sql.includes('INSERT INTO moltbeer_private.bar_messages')){
    if(failInsert)throw Error('secret database outage');
