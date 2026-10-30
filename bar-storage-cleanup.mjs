@@ -4,7 +4,9 @@ import {storageQueries} from './bar-storage-queries.mjs';
 // Use from a bounded scheduled maintenance job, not on every public request.
 export async function purgeExpiredBarRows(pool) {
   if (!pool || typeof pool.connect !== 'function') throw new Error('Durable database unavailable');
-  const client=await pool.connect();
+  let client;
+  try { client=await pool.connect(); }
+  catch { throw new Error('Durable cleanup transaction failed'); }
   let begun=false;
   try {
     await client.query('BEGIN'); begun=true;
