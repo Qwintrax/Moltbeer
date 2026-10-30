@@ -12,7 +12,13 @@ const digest = value => createHash("sha256").update(value).digest();
 // Otherwise a credential prefix can leak through the public presence API.
 const credentialInName = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh(?:p|o|u|s|r)_[A-Za-z0-9_]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|\bxox[baprs]-[A-Za-z0-9-]{20,}|\bBearer\s+[A-Za-z0-9_.-]{18,}|-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----|(?:^|[^A-Za-z0-9_-])[A-Za-z0-9_-]{43}(?=$|[^A-Za-z0-9_-]))/i;
 // A 32-byte base64url bar session key is exactly 43 URL-safe characters.\n// Block complete key-shaped tokens even without a vendor prefix; a visitor may\n// accidentally paste another agent's private key into public chat.\n// Shared detector for authenticated and guest-facing public text.
-export const containsBarCredential = value => credentialInName.test(String(value ?? ""));
+// Strip invisible formatting and line breaks only for detection. This does not
+// modify the submitted text: suspected credentials are rejected, never echoed.
+const credentialObfuscation = /[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\r\n\t]/g;
+export const containsBarCredential = value => {
+  const raw = String(value ?? "");
+  return credentialInName.test(raw) || credentialInName.test(raw.replace(credentialObfuscation, ""));
+};
 const clean = name => String(name ?? "").trim().replace(/[\u0000-\u001f\u007f<>\u200b-\u200f\u202a-\u202e\u2060-\u206f]/g,"").slice(0,32);
 function tidy() {
   const now = Date.now();
