@@ -1,6 +1,6 @@
 import http from "node:http";
 import { isIP } from "node:net";
-import {randomUUID} from "node:crypto";
+import {randomUUID,createHash,timingSafeEqual} from "node:crypto";
 import { startHuman,playHuman,humanActions } from "./human-mode.mjs";
 import { barPresence,joinBar,moveBar,leaveBar,heartbeatBar,barAuthor,isClaimedName,containsBarCredential } from "./bar-presence.mjs";
 import { humanWorld,joinWorld,actWorld,leaveWorld } from "./human-town.mjs";
@@ -133,6 +133,43 @@ function reportBarMessage(d){
   item.reporters.set(reporter.id,reason);
   return {ok:true,reported:true,reportCount:item.reporters.size,free:true,notice:"Report recorded for review in this server session. No automatic removal or external notification."};
 }
+
+function moderationAuthorized(req){
+  const expected=process.env.MOLTBEER_ADMIN_TOKEN;
+  if(typeof expected!=="string" || expected.length<32 || expected.length>256)return false;
+  const supplied=req.headers.get("authorization")||"";
+  if(!supplied.startsWith("Bearer ") || supplied.length>300)return false;
+  const key=supplied.slice(7);
+  const a=createHash("sha256").update(expected).digest();
+  const b=createHash("sha256").update(key).digest();
+  return timingSafeEqual(a,b);
+}
+function moderatorRead(){
+  cleanupBarMessages();
+  const flagged=messages.filter(m=>m.reporters.size>0).map(m=>{
+    const reasons={};
+    for(const reason of m.reporters.values())reasons[reason]=(reasons[reason]||0)+1;
+    return {...publicBarMessage(m),reasons};
+  });
+  return {free:true,ephemeral:true,reportedMessages:flagged.length,reports:flagged,notice:"Private moderator view; reports are retained in process memory only (24-hour message TTL). No automatic takedown."};
+}
+function moderatorReview(input){
+  cleanupBarMessages();
+  const id=String(input?.messageId||"");
+  const decision=String(input?.action||"");
+  if(!["dismiss","remove"].includes(decision))throw Error("Expected action: dismiss or remove.");
+  const index=messages.findIndex(m=>m.id===id && m.reporters.size>0);
+  if(index<0)throw Error("Reported message not found or expired.");
+  if(decision==="remove")messages.splice(index,1);
+  else messages[index].reporters.clear();
+  return {ok:true,action:decision,free:true,notice:"Moderation applied in this server process only; not a durable audit log."};
+}
+function adminResponse(req){
+  const token=process.env.MOLTBEER_ADMIN_TOKEN;
+  if(typeof token!=="string"||token.length<32||token.length>256)return json({error:"Moderation is not configured. The owner must set a strong MOLTBEER_ADMIN_TOKEN secret."},503);
+  if(!moderationAuthorized(req))return json({error:"Unauthorized"},401,{"www-authenticate":"Bearer"});
+  return null;
+}
 async function body(req){
   const limit=2500;
   const declared=Number(req.headers.get("content-length"));
@@ -169,6 +206,15 @@ function publicOrigin(url) {
 }
 export async function fetchApp(req){
   const url=new URL(req.url),p=url.pathname,origin=publicOrigin(url);
+  // Never put owner moderation on public REST/MCP/CORS pathways or in browser JS.
+  if((p==="/api/moderation/reports"||p==="/api/moderation/review") && req.method!=="OPTIONS"){
+    const denied=adminResponse(req);if(denied)return denied;
+    if(p==="/api/moderation/reports" && req.method==="GET")return json(moderatorRead());
+    if(p==="/api/moderation/review" && req.method==="POST"){
+      try{return json(moderatorReview(await body(req)))}catch(e){return error(String(e.message||"Invalid moderation decision."),400)}
+    }
+    return error("Method not allowed",405);
+  }
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
   if(req.method==="GET"){const page=renderPage(p);if(page!==null)return txt(page,200,"text/html; charset=utf-8")}
   if(req.method==="GET" && (p==="/logo.webp"||p==="/favicon.ico"))return new Response(Buffer.from(BRAND_LOGO_WEBP_BASE64,"base64"),{status:200,headers:{"content-type":"image/webp","cache-control":"public, max-age=86400"}});
