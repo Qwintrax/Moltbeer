@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validatePrivateDatabaseUrl,createPrivateDatabasePool} from '../bar-storage-pool.mjs';
+import {X509Certificate} from 'node:crypto';
 import {verifyPrivateStorageOnce} from '../storage-readiness.mjs';
 const target='postgresql://postgres.nbjhjnswqmpcpbsvbwff:encoded%40password@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require';
 test('accepts only dedicated TLS-enabled Supabase pooler',()=>{
@@ -19,6 +20,10 @@ test('creates bounded pool and checks database before returning',async()=>{
  class Pool{constructor(c){config=c}async query(){return {rows:[{ok:1}]}}async end(){}}
  const pool=await createPrivateDatabasePool({databaseUrl:target,PoolClass:Pool});
  assert.ok(pool);assert.equal(config.max,3);assert.equal(config.ssl.rejectUnauthorized,true);
+ assert.match(config.ssl.ca,/-----BEGIN CERTIFICATE-----/);
+ const fingerprint=new X509Certificate(config.ssl.ca).fingerprint256.replaceAll(':','').toLowerCase();
+ assert.equal(fingerprint,'807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa');
+ assert.equal(config.ssl.servername,undefined); // Let pg/Node verify the real pooler hostname.
  assert.equal(config.connectionString.includes('sslmode'),false);
  assert.equal(config.connectionString.includes('encoded%40password'),true);
 });
@@ -66,4 +71,14 @@ test('constructor failures retain only static reason classifications',async()=>{
    assert.doesNotMatch(JSON.stringify(e),/private key|encoded%40password/);
    return true;
  });
+});
+
+test('CA pin remains enabled even when caller supplies the validated sslmode=require URI',async()=>{
+ let options;
+ class Pool{constructor(o){options=o}async query(){return {rows:[{ok:1}]}}async end(){}}
+ await createPrivateDatabasePool({databaseUrl:target,PoolClass:Pool});
+ assert.equal(options.ssl.rejectUnauthorized,true);
+ assert.equal(options.connectionString.includes('sslmode'),false);
+ assert.equal(new X509Certificate(options.ssl.ca).subject.includes('Supabase Root 2021 CA'),true);
+ assert.equal(options.ssl.ca.includes('PRIVATE KEY'),false);
 });
