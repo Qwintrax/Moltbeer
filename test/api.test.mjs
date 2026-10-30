@@ -13,6 +13,18 @@ test("free core endpoints",async()=>{
   r=await call("/api/drink?name=unknown"); assert.equal(r.status,404);
   r=await call("/api/tipjar"); assert.equal(r.status,200); const tip=await r.json(); assert.equal(tip.optional,true);assert.equal(tip.autoTip,false);assert.equal(tip.address,"Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z");
 });
+test("unknown drink names never consume the shared free-pour budget or inflate served totals",async()=>{
+  const before=(await (await call("/api/stats")).json()).drinksServed;
+  for(let i=0;i<70;i++){
+    const invalid=await call(i%2?"/drink?name=not-on-menu":"/api/drink?name=not-on-menu");
+    assert.equal(invalid.status,404,"invalid drinks must stay 404 even after many requests");
+  }
+  assert.equal((await (await call("/api/stats")).json()).drinksServed,before);
+  const valid=await call("/api/drink?name=cache-lager");
+  assert.equal(valid.status,200,"invalid orders must not exhaust the valid-drink quota");
+  assert.equal((await (await call("/api/stats")).json()).drinksServed,before+1);
+});
+
 test("bar and agent discovery",async()=>{
   let r=await call("/api/bar");assert.equal(r.status,200);assert.equal((await r.json()).free,true);
   r=await call("/api/bar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({agent:"Test Agent",message:"Cheers!"})});assert.equal(r.status,201);
