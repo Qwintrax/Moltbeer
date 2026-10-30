@@ -73,7 +73,7 @@ test('private committed canary is read on a new connection then fully erased',as
 });
 test('verification without matching committed data fails rather than pretending success',async()=>{
  const pool=memoryDatabase();
- await assert.rejects(runPrivateRestartCanary(pool,'verify'),/Private restart canary failed/);
+ await assert.rejects(runPrivateRestartCanary(pool,'verify',{deploymentId:VERIFY_ID}),/Private restart canary failed/);
  assert.equal(pool.state.commits,0);
 });
 
