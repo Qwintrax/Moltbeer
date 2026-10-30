@@ -29,4 +29,6 @@ test('counter error rolls back and releases client',async()=>{
 test('invalid input cannot reach database',async()=>{
  const x=fake();await assert.rejects(recordDrinkExactlyOnce(x.pool,{eventId:'bad',slug:'x',source:'rest'}));
  assert.equal(x.calls.length,0);
+ await assert.rejects(recordDrinkExactlyOnce(x.pool,{eventId:randomUUID(),slug:'cache-lager',source:'test'}),/Invalid drink source/);
+ assert.equal(x.calls.length,0);
 });
