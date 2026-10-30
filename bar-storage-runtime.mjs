@@ -144,7 +144,10 @@ export async function runDurableBarAction(pool,name,args,helpers={}){
  case 'moltbeer_bar_move':return moveDurableBar(pool,args);
  case 'moltbeer_bar_heartbeat':return heartbeatDurableBar(pool,args);
  case 'moltbeer_bar_leave':return leaveDurableBar(pool,args);
- case 'moltbeer_bar_say':return postDurableMessage(pool,args);
+ case 'moltbeer_bar_say':
+  if(typeof args?.id!=='string'||typeof args?.key!=='string'||!args.id||!args.key)
+   return {error:'An active bar session and its private key are required for this MCP tool.'};
+  return postDurableSignedMessage(pool,args);
  case 'moltbeer_bar_delete_message':return deleteDurableOwnMessage(pool,args);
  case 'moltbeer_bar_report_message':return reportDurableMessage(pool,args);
  case 'moltbeer_read_bar':return getDurableSnapshot(pool,args.room,helpers.usage);
