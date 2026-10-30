@@ -12,7 +12,7 @@ export const storageQueries = Object.freeze({
   updatePresence: `UPDATE moltbeer_private.bar_sessions
     SET room=$2,spot=$3,mood=$4,last_seen=now(),expires_at=now()+interval '30 minutes'
     WHERE session_id=$1 AND expires_at>now()
-    RETURNING session_id,expires_at`,
+    RETURNING session_id,last_seen,expires_at`,
   insertMessage: `INSERT INTO moltbeer_private.bar_messages
     (message_id,session_id,nickname,room,content,signed)
     VALUES ($1,$2,$3,$4,$5,$6) RETURNING message_id,created_at`,
