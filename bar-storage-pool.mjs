@@ -49,7 +49,17 @@ export async function createPrivateDatabasePool({
   const connectionString=validatePrivateDatabaseUrl(databaseUrl,projectId);
   // Dependency injected so tests never contact production.
   if (typeof PoolClass!=='function') throw Error('PostgreSQL driver not provided');
-  // Supavisor's certificate is signed by a private Supabase CA, not Node's\n  // system roots. Check the public trust anchor against the published SHA-256\n  // fingerprint before trusting it; NEVER disable certificate verification.\n  let ca;\n  try {\n    ca=readFileSync(new URL('./certs/supabase-root-2021.crt',import.meta.url),'utf8');\n    const sha=new X509Certificate(ca).fingerprint256.replaceAll(':','').toLowerCase();\n    if(sha!=='807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa')throw Error('CA fingerprint mismatch');\n  }catch{throw Error('Private database CA unavailable')}\n  let pool;\n  try {pool=new PoolClass({
+  // Supavisor's certificate is signed by a private Supabase CA, not Node's
+  // system roots. Check the public trust anchor against the published SHA-256
+  // fingerprint before trusting it; NEVER disable certificate verification.
+  let ca;
+  try {
+    ca=readFileSync(new URL('./certs/supabase-root-2021.crt',import.meta.url),'utf8');
+    const sha=new X509Certificate(ca).fingerprint256.replaceAll(':','').toLowerCase();
+    if(sha!=='807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa')throw Error('CA fingerprint mismatch');
+  }catch{throw Error('Private database CA unavailable')}
+  let pool;
+  try {pool=new PoolClass({
     connectionString,
     max:3,
     idleTimeoutMillis:10000,
