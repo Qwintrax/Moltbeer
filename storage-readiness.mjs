@@ -23,7 +23,9 @@ export async function verifyPrivateStorageOnce({databaseUrl,PoolClass,createPool
     // with the same allowlisted, credential-free validator used by preflight.
     const reason=configurationError
       ? (validateMoltbeerDatabaseUrl(databaseUrl).reason||'invalid_database_url')
-      : err?.message==='Storage schema incomplete'?'schema_incomplete':'connection_failed';
+      : err?.message==='Storage schema incomplete'?'schema_incomplete'
+      : ['authentication_failed','tls_verification_failed','network_unavailable'].includes(err?.safeReason)
+        ? err.safeReason : 'connection_failed';
     return {configured:true,connected:false,mode:'ephemeral',reason};
   }finally{
     if(pool)try{await pool.end()}catch{}
