@@ -7,6 +7,8 @@ function fake({duplicate=false,failCounter=false}={}){
  const calls=[];let released=false;
  const client={async query(sql,args){calls.push({sql,args});
   if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK')return {rowCount:0};
+  if(sql.includes('pg_advisory_xact_lock'))return {rowCount:1,rows:[{}]};
+  if(sql.includes('count(*)::int AS n'))return {rowCount:1,rows:[{n:0}]};
   if(sql.includes('INSERT INTO moltbeer_private.drink_events'))return {rowCount:duplicate?0:1,rows:duplicate?[]:[{event_id:args[0]}]};
   if(sql.includes('INSERT INTO moltbeer_private.bar_metrics')){if(failCounter)throw Error('database unavailable');return {rowCount:1,rows:[{total:'1'}]};}
   throw Error('unexpected query');},release(){released=true}};
@@ -15,7 +17,7 @@ function fake({duplicate=false,failCounter=false}={}){
 test('one event inserts and increments in one committed transaction',async()=>{
  const x=fake();const r=await recordDrinkExactlyOnce(x.pool,{eventId:randomUUID(),slug:'cache-lager',source:'rest'});
  assert.equal(r.recorded,true);assert.equal(r.total,'1');
- assert.deepEqual(x.calls.map(v=>v.sql==='BEGIN'?'BEGIN':v.sql==='COMMIT'?'COMMIT':v.sql.startsWith('INSERT INTO moltbeer_private.drink_events')?'event':'metric'),['BEGIN','event','metric','COMMIT']);
+ assert.deepEqual(x.calls.map(v=>v.sql==='BEGIN'?'BEGIN':v.sql==='COMMIT'?'COMMIT':v.sql.startsWith('INSERT INTO moltbeer_private.drink_events')?'event':'metric'),['BEGIN','metric','metric','event','metric','COMMIT']);
  assert.equal(x.released,true);
 });
 test('duplicate event never increments the counter',async()=>{

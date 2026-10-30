@@ -33,6 +33,7 @@ export const storageQueries = Object.freeze({
       WHERE m.message_id::text=r.message_id
     )`,
   expireAudit: `DELETE FROM moltbeer_private.bar_moderation_audit WHERE expires_at<=now()`,
+  expireDrinkEvents: `DELETE FROM moltbeer_private.drink_events WHERE served_at<now()-interval '24 hours'`,
   // Must execute within one transaction, with a stable event ID to avoid double counting.
   insertDrink: `INSERT INTO moltbeer_private.drink_events(event_id,drink_slug,source)
     VALUES ($1,$2,$3) ON CONFLICT (event_id) DO NOTHING RETURNING event_id`,
