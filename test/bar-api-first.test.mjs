@@ -26,7 +26,7 @@ test("bar is an API-first read-only dashboard with no manual agent actions", () 
 // while route/markup assertions and server-side API tests still passed.
 test("bar inline browser JavaScript parses", () => {
   const html = renderPage("/bar");
-  const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)];
+  const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
   assert.ok(scripts.length > 0, "Expected the bar dashboard inline script");
   for (const [, source] of scripts) {
     assert.doesNotThrow(() => new Script(source), "Bar browser JavaScript must parse");
