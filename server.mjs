@@ -403,6 +403,23 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
         console.log("MOLTBEER private database rollback acceptance: UNAVAILABLE (nothing committed)");
       }finally{if(probePool)try{await probePool.end()}catch{}}
     }
+    // One-shot, restart-spanning *private* Supabase canary. Never expose this
+    // internal diagnostic identity to live visitors or inflate public totals.
+    // The owner explicitly selects seed, verify, cleanup or disables the flag.
+    const canaryPhase=process.env.MOLTBEER_RESTART_CANARY_PHASE;
+    if(["seed","verify","cleanup"].includes(canaryPhase) && !durableModeEnabled()){
+      let canaryPool;
+      try{
+        const [{Pool},{createPrivateDatabasePool},{runPrivateRestartCanary}]=await Promise.all([
+          import("pg"),import("./bar-storage-pool.mjs"),import("./scripts/storage-restart-canary.mjs")
+        ]);
+        canaryPool=await createPrivateDatabasePool({PoolClass:Pool,databaseUrl:process.env.DATABASE_URL});
+        const result=await runPrivateRestartCanary(canaryPool,canaryPhase);
+        console.log("MOLTBEER private restart canary:",result.passed?"PASS":"UNAVAILABLE",canaryPhase);
+      }catch{
+        console.log("MOLTBEER private restart canary: UNAVAILABLE",canaryPhase);
+      }finally{if(canaryPool)try{await canaryPool.end()}catch{}}
+    }
     // Durable mode uses only the already-existing Supabase project and this
      // single Railway service. No fallback to process memory on DB failures.
      if(durableModeEnabled()){
