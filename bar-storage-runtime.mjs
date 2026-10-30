@@ -8,25 +8,37 @@ import {postDurableSignedMessage,readDurableBarMessages,deleteDurableOwnMessage}
 import {recordDrinkExactlyOnce} from './bar-storage-transactions.mjs';
 import {purgeExpiredBarRows} from './bar-storage-cleanup.mjs';
 import {assertDurableWriteCapacity} from './bar-storage-quotas.mjs';
+import {verifyDurablePoolHealth} from './bar-storage-health.mjs';
 
 export const durableModeEnabled = (env=process.env) => env.MOLTBEER_STORAGE_MODE === 'durable';
-let poolPromise,retryAfter=0;
+let poolPromise,retryAfter=0,healthCheckedAt=0,healthPromise;
 export async function getDurablePool(){
  if(!durableModeEnabled()) throw Error('Durable mode disabled');
- // A transient auth/network outage must not poison the pool promise until
- // the next Railway restart. Retry with a short throttle, never expose errors.
+ // A transient network outage must not poison the pool promise until restart.
  if(!poolPromise){
   if(Date.now()<retryAfter)throw Error('Durable storage temporarily unavailable');
   poolPromise=(async()=>{
    const {Pool}=await import('pg');
-   return createPrivateDatabasePool({PoolClass:Pool,databaseUrl:process.env.DATABASE_URL});
+   const pool=await createPrivateDatabasePool({PoolClass:Pool,databaseUrl:process.env.DATABASE_URL});
+   healthCheckedAt=Date.now();
+   return pool;
   })().catch(()=>{
    poolPromise=null;
    retryAfter=Date.now()+5000;
    throw Error('Durable storage temporarily unavailable');
   });
  }
- return poolPromise;
+ const pool=await poolPromise;
+ // Unlike an allocated Pool, a short live query establishes health. A bounded
+ // shared check protects /health and REST/MCP without polling for each request.
+ if(Date.now()-healthCheckedAt>=5000){
+  if(!healthPromise)healthPromise=(async()=>{
+   if(!await verifyDurablePoolHealth(pool))throw Error('Durable storage temporarily unavailable');
+   healthCheckedAt=Date.now();
+  })().finally(()=>{healthPromise=null});
+  await healthPromise;
+ }
+ return pool;
 }
 export function publicDurableError(err){
  return err?.code==='BAR_CAPACITY'?{status:429,message:'The free bar is at its storage capacity. Please try again later.'}
