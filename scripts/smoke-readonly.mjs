@@ -4,6 +4,11 @@
 import assert from "node:assert/strict";
 
 const raw = process.env.MOLTBEER_BASE_URL;
+const expectedPersistence = process.env.MOLTBEER_EXPECTED_PERSISTENCE || "ephemeral";
+if (!["ephemeral","durable"].includes(expectedPersistence)) {
+  console.error("MOLTBEER_EXPECTED_PERSISTENCE must be ephemeral or durable.");
+  process.exit(2);
+}
 if (!raw) {
   console.error("Set MOLTBEER_BASE_URL to the approved bar origin.");
   process.exitCode = 2;
@@ -42,11 +47,11 @@ if (!raw) {
       const type = response.headers.get("content-type") || "";
       assert.equal(response.status, 200, path + " HTTP status");
       assert.ok(type.includes(expectedType), path + " content-type: " + type);
-      if (path === "/health") { const state=await response.json(); assert.equal(state.ok,true); assert.equal(state.persistence,"ephemeral","Do not claim permanent storage before proven"); }
+      if (path === "/health") { const state=await response.json(); assert.equal(state.ok,true); assert.equal(state.persistence,expectedPersistence,"Health persistence must match the explicitly requested storage mode"); }
       if (path === "/api/stats") {
         const stats = await response.json();
-        assert.equal(stats.counterScope, "since_server_restart");
-        assert.equal(stats.persistence, "ephemeral");
+        assert.equal(stats.counterScope, expectedPersistence==="durable"?"since_storage_enabled":"since_server_restart");
+        assert.equal(stats.persistence,expectedPersistence);
       }
       if (path === "/api/bar") {
         const etag=response.headers.get("etag");
