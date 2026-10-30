@@ -17,7 +17,10 @@ export function validatePrivateDatabaseUrl(value,projectId='nbjhjnswqmpcpbsvbwff
   // Node-postgres parses sslmode from a connection string and can override
   // ssl.rejectUnauthorized. Remove that option *after* validating it and pass
   // a strict TLS config separately. Keep the password percent-encoded.
-  if (decodeURIComponent(u.password)==='[YOUR-PASSWORD]' || decodeURIComponent(u.password).length<8)
+  let decodedPassword;
+  try { decodedPassword=decodeURIComponent(u.password) }
+  catch { throw Error('Invalid database configuration') }
+  if (decodedPassword==='[YOUR-PASSWORD]' || decodedPassword.length<8)
     throw Error('Invalid database configuration');
   u.searchParams.delete('sslmode');
   return u.toString();
