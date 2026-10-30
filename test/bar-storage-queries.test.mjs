@@ -16,3 +16,8 @@ test('drink events are idempotent and counters atomic',()=>{
 test('cleanup covers all expiring private records',()=>{
  for(const key of ['expireSessions','expireMessages','expireReports','expireAudit']) assert.ok(storageQueries[key].includes('expires_at<=now()'));
 });
+
+test('counter metric name matches the deployed Supabase CHECK constraint',()=>{
+ assert.match(storageQueries.incrementDrinkMetric,/drinks_served_since_storage_enabled/);
+ assert.doesNotMatch(storageQueries.incrementDrinkMetric,/VALUES \('drinks_served',/);
+});
