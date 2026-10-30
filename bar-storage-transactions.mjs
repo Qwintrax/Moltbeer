@@ -1,4 +1,5 @@
 import {storageQueries} from './bar-storage-queries.mjs';
+import {assertDurableWriteCapacity} from './bar-storage-quotas.mjs';
 
 // Accepts a connected node-postgres Pool or compatible client provider.
 // This does NOT enable the adapter on live endpoints. All writes fail closed.
@@ -16,6 +17,7 @@ export async function recordDrinkExactlyOnce(pool,{eventId,slug,source}) {
   let begun=false;
   try {
     await client.query('BEGIN'); begun=true;
+    await assertDurableWriteCapacity(client,'drink');
     const inserted=await client.query(storageQueries.insertDrink,[eventId,slug,source]);
     let total=null;
     if (inserted.rowCount===1) {
@@ -27,8 +29,9 @@ export async function recordDrinkExactlyOnce(pool,{eventId,slug,source}) {
     }
     await client.query('COMMIT'); begun=false;
     return {recorded:inserted.rowCount===1,total};
-  } catch {
+  } catch (err) {
     if (begun) { try { await client.query('ROLLBACK'); } catch {} }
+    if(err?.code==='BAR_CAPACITY')throw err;
     throw new Error('Durable drink transaction failed');
   } finally {
     client.release();
