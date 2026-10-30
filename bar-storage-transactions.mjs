@@ -4,13 +4,15 @@ import {storageQueries} from './bar-storage-queries.mjs';
 // This does NOT enable the adapter on live endpoints. All writes fail closed.
 export async function recordDrinkExactlyOnce(pool,{eventId,slug,source}) {
   if (!pool || typeof pool.connect !== 'function') throw new Error('Durable database unavailable');
-  if (typeof eventId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(eventId))
+  if (typeof eventId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId))
     throw new Error('Invalid drink event ID');
   if (typeof slug !== 'string' || !/^[a-z0-9-]{1,64}$/.test(slug))
     throw new Error('Invalid drink slug');
   if (typeof source !== 'string' || !['rest','mcp','human_world'].includes(source))
     throw new Error('Invalid drink source');
-  const client=await pool.connect();
+  let client;
+  try { client=await pool.connect(); }
+  catch { throw new Error('Durable drink transaction failed'); }
   let begun=false;
   try {
     await client.query('BEGIN'); begun=true;
