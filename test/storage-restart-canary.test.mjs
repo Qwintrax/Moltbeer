@@ -43,9 +43,11 @@ function memoryDatabase(){
       const row=state.messages.get(params[0]);return {rows:row?[row]:[]}
     }
     if(sql.startsWith('INSERT INTO moltbeer_private.bar_sessions')){
+      assert.match(sql,/expires_at\) VALUES\(.+now\(\)-interval '1 second'/,'private canary session must already be expired');
       state.sessions.set(params[0],{name:params[1]});return {rows:[]}
     }
     if(sql.startsWith('INSERT INTO moltbeer_private.bar_messages')){
+      assert.match(sql,/expires_at\) VALUES\(.+now\(\)-interval '1 second'/,'private canary message must already be expired');
       state.messages.set(params[0],{session_id:params[1],content:params[4]});return {rows:[]}
     }
     if(sql.startsWith('DELETE FROM moltbeer_private.bar_messages')){
