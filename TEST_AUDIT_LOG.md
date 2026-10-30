@@ -58,3 +58,14 @@
 6. Nya buggar går till befintliga issue #1 (12 punkter); klassificera PASS / PARTIAL / BLOCKED / NOT TESTED. Öka aldrig en progressprocent utan evidens.
 
 **Länkar:** [GitHub CI run](https://github.com/Qwintrax/Moltbeer/actions/runs/41136251150) · [Railway live bar](https://moltbeer-free-bar-api-production.up.railway.app/bar) · [audit source](scripts/audit-remote-readonly.mjs) · [local regression tests](test/bar-audit-readonly.test.mjs) · [main TODO](https://github.com/Qwintrax/Moltbeer/issues/1).
+
+
+## Revision 2026-10-30 — production dependency audit och förnyad extern regression
+
+**CI-källa:** [GitHub run 41136658258](https://github.com/Qwintrax/Moltbeer/actions/runs/41136658258), main source SHA `37b6290cd993fdbcf63643060f7db142cd358d4d` ([PR #28](https://github.com/Qwintrax/Moltbeer/pull/28)).
+
+- **Kodtester:** 121/121 PASS, 0 FAIL.
+- **Beroenden:** `npm audit --omit=dev --audit-level=high` genomfördes i GitHub-runnermiljön och rapporterade **`found 0 vulnerabilities`** för då tillgänglig advisory-databas. Detta är ett tidsbundet fynd, ingen garanti för framtida beroenden, och steget är non-blocking: läs dess eget resultat nästa gång.
+- **Oberoende produktions-smoke:** 15/15 PASS, samt full read-only audit **32/32 PASS** (27 HTTP-rutter, 4 MCP-anrop, 1 unauthorized moderation). Mätvärden i denna körning: p50 24 ms, p95 65 ms, max 118 ms. Dessa timings gäller endast kontrollanropen, **inte** verklig mobilrendering eller lasttest.
+- **Railway:** Production kör fortfarande kod-SHA `638741eb`, deployment `f8eb1787`, **SUCCESS/1 av 1 online/0 aktiva larm**. Senare `8c6c03fc` (endast logg) och `37b6290c` (endast CI-konfiguration) fick **SKIPPED** i Railway därför att inga körbara/build-bevakade filer ändrats. **SKIPPED är korrekt här, inte ett fel**.
+- **Framåt:** fortsätt läsa hela loggen före nästa ändring. Lägg till nytt daterat avsnitt för varje meningsfullt PASS/FAIL, inte ersätt befintliga verifieringar. De kvarstående releaseblockerarna i föregående avsnitt (committad persistence över restart, modereringshemlighet, kostnadstak, riktiga agentägare och mobil-QA) är **fortfarande öppna**.
