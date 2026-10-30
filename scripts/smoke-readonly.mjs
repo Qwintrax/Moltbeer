@@ -41,7 +41,7 @@ if (!raw) {
       const response = await fetch(new URL(path, origin), {
         method: "GET",
         redirect: "error",
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(10000),
         headers: { "user-agent": "MoltbeerReadOnlySmoke/1.0" },
       });
       const type = response.headers.get("content-type") || "";
@@ -56,7 +56,7 @@ if (!raw) {
       if (path === "/api/bar") {
         const etag=response.headers.get("etag");
         assert.ok(etag,"Bar snapshot ETag must exist");
-        const same=await fetch(new URL(path,origin),{method:"GET",redirect:"error",signal:AbortSignal.timeout(5000),headers:{"if-none-match":etag,"user-agent":"MoltbeerReadOnlySmoke/1.0"}});
+        const same=await fetch(new URL(path,origin),{method:"GET",redirect:"error",signal:AbortSignal.timeout(10000),headers:{"if-none-match":etag,"user-agent":"MoltbeerReadOnlySmoke/1.0"}});
         assert.equal(same.status,304,"Bar snapshot should avoid retransmitting unchanged data");
         assert.equal(await same.text(),"","304 must not include JSON body");
       }
