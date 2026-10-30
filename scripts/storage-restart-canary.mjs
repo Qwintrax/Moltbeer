@@ -8,6 +8,8 @@ export const RESTART_CANARY_SESSION='b237bf95-c9df-45b8-91cb-7c1fe4e51f26';
 export const RESTART_CANARY_MESSAGE='7cdd1b81-7955-4caf-a575-c4d18e923dbf';
 const CANARY_NAME='InternalRestartCheck';
 const CANARY_TEXT='Private restart persistence acceptance check';
+const DEPLOYMENT_ID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i;
+const taggedMessage=id=>CANARY_TEXT+' | deployment='+id;
 
 async function tx(pool,doWork){
  if(!pool||typeof pool.connect!=='function')throw Error('Private canary database unavailable');
@@ -34,9 +36,13 @@ async function purgeCanary(client){
  await client.query('DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1',[RESTART_CANARY_MESSAGE]);
  await client.query('DELETE FROM moltbeer_private.bar_sessions WHERE session_id=$1',[RESTART_CANARY_SESSION]);
 }
-export async function runPrivateRestartCanary(pool,phase){
+export async function runPrivateRestartCanary(pool,phase,{deploymentId=process.env.RAILWAY_DEPLOYMENT_ID}={}){
  if(!['seed','verify','cleanup'].includes(phase))throw Error('Invalid private canary phase');
  if(process.env.MOLTBEER_STORAGE_MODE==='durable')throw Error('Canary requires ephemeral public routes');
+ // Seed and verify MUST identify different real Railway deployments. Never
+ // report a same-process readback as proof of restart-spanning persistence.
+ if(phase!=='cleanup' && (typeof deploymentId!=='string'||!DEPLOYMENT_ID.test(deploymentId)))
+  throw Error('Private Railway deployment identity unavailable');
  if(phase==='seed'){
   return tx(pool,async client=>{
    await purgeCanary(client);
@@ -46,9 +52,9 @@ export async function runPrivateRestartCanary(pool,phase){
     [RESTART_CANARY_SESSION,CANARY_NAME,keyHash,'counter','entrance','focused']);
    await client.query(
     'INSERT INTO moltbeer_private.bar_messages(message_id,session_id,nickname,room,content,signed) VALUES($1,$2,$3,$4,$5,true)',
-    [RESTART_CANARY_MESSAGE,RESTART_CANARY_SESSION,CANARY_NAME,'counter',CANARY_TEXT]);
+    [RESTART_CANARY_MESSAGE,RESTART_CANARY_SESSION,CANARY_NAME,'counter',taggedMessage(deploymentId)]);
    const found=await countCanary(client);
-   if(found.session?.name!==CANARY_NAME || found.message?.content!==CANARY_TEXT)
+   if(found.session?.name!==CANARY_NAME || found.message?.content!==taggedMessage(deploymentId))
     throw Error('Private canary seed readback failed');
    return {phase:'seed',passed:true,notice:'Private probe committed; verify must run after a new Railway deployment'};
   });
@@ -61,8 +67,12 @@ export async function runPrivateRestartCanary(pool,phase){
  // evidence for diagnosis; an explicit cleanup mode can remove it afterwards.
  return tx(pool,async client=>{
   const found=await countCanary(client);
+  const stored=found.message?.content;
+  const seedDeployment=typeof stored==='string'&&stored.startsWith(CANARY_TEXT+' | deployment=')
+    ?stored.slice((CANARY_TEXT+' | deployment=').length):null;
   const matched=found.session?.name===CANARY_NAME &&
-    found.message?.content===CANARY_TEXT &&
+    typeof seedDeployment==='string' && DEPLOYMENT_ID.test(seedDeployment) &&
+    seedDeployment!==deploymentId &&
     String(found.message?.session_id)===RESTART_CANARY_SESSION;
   await purgeCanary(client);
   if(!matched)throw Error('Private canary did not survive restart');
