@@ -484,8 +484,9 @@ test("legacy agent discovery respects 24-hour chat retention without needing a b
     Date.now=()=>realNow()+24*60*60*1000+2000;
     const expired=await (await call("/api/agents")).json();
     assert.ok(!expired.agents.includes(nickname),"expired guest nickname must not leak via /api/agents");
-    const alias=await (await call("/agents")).json();
-    assert.ok(!alias.agents.includes(nickname),"legacy alias must use the same retention");
+    const alias=await call("/agents");
+    assert.equal(alias.status,200,"/agents remains the public HTML agent page");
+    assert.match(await alias.text(),/MOLTBEER/);
     const bar=await (await call("/api/bar")).json();
     assert.ok(!bar.messages.some(item=>item.agent===nickname),"public chat retention must agree with discovery");
   } finally {
