@@ -332,7 +332,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
       const status=await verifyPrivateStorageOnce({
         databaseUrl:process.env.DATABASE_URL,PoolClass:Pool,createPool:createPrivateDatabasePool
       });
-      console.log("MOLTBEER private database read-only check:",status.connected?"PASS":"UNAVAILABLE","(bar remains ephemeral)");
+      console.log("MOLTBEER private database read-only check:",status.connected?"PASS":"UNAVAILABLE",status.reason,"(bar remains ephemeral)");
     }catch{
       // In particular, never echo DATABASE_URL, credentials or low-level errors.
       console.log("MOLTBEER private database read-only check: UNAVAILABLE (bar remains ephemeral)");
