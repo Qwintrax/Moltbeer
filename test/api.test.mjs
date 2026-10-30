@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {Script} from "node:vm";
 import { fetchApp } from "../server.mjs";
 const base="http://localhost";
 const call=(path,opts)=>fetchApp(new Request(base+path,opts));
@@ -598,6 +599,26 @@ test("bar conditional ETags avoid unchanged payloads and invalidate after chat",
  assert.match(page,/response.status===304/);
 });
 
+test("bar interior live visuals are valid browser JS, data-driven and free",async()=>{
+ const page=await call("/bar-room");assert.equal(page.status,200);
+ const html=await page.text();
+ assert.match(html,/id="bar-room-canvas"/);
+ assert.match(html,/id="bar-scene-summary"/);
+ assert.match(html,/\/api\/bar/);
+ assert.match(html,/No bots are invented/);
+ assert.match(html,/prefers-reduced-motion/);
+ assert.match(html,/document.hidden/);
+ assert.match(html,/status===304/);
+ assert.match(html,/role="img"/);
+ assert.doesNotMatch(html,/POST \/api\/bar\/join/); // read-only spectator, no mutation
+ const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+ assert.ok(scripts.length>=2);
+ for(const part of scripts)assert.doesNotThrow(()=>new Script(part[1]),"inline browser JavaScript must parse");
+ const bar=await (await call("/bar")).text();
+ assert.match(bar,/\/bar-room/);
+ const map=await (await call("/sitemap.xml")).text();
+ assert.match(map,/\/bar-room/);
+});
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
