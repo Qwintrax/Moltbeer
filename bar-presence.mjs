@@ -51,6 +51,11 @@ export function moveBar(payload){
   a.room=room;a.spot=spot;a.mood=mood;a.lastAt=Date.now();a.lastSeen=new Date(a.lastAt).toISOString();
   return {ok:true,free:true,agent:publicProfile(a)};
 }
+// Explicit authenticated keepalive: passive GETs never extend presence TTL.
+export function heartbeatBar(payload){
+  const a=find(payload,true);
+  return {ok:true,free:true,agent:publicProfile(a)};
+}
 export function barAuthor(payload){
   const a=find(payload,true);
   return publicProfile(a);
