@@ -77,7 +77,7 @@ test("live drinks-served count includes each successful free pour",async()=>{
 });
 
 test("GET virtual drink abuse protection keeps this-shift count honest",async()=>{
- const who={"x-forwarded-for":"198.51.100.42"};
+ const who={"x-real-ip":"198.51.100.42"};
  const before=(await (await call("/api/stats")).json()).drinksServed;
  for(let i=0;i<60;i++){const r=await call("/api/beer",{headers:who});assert.equal(r.status,200);}
  const denied=await call("/api/beer",{headers:who});
@@ -90,13 +90,13 @@ test("GET virtual drink abuse protection keeps this-shift count honest",async()=
 });
 test("oversized JSON is rejected without reading the entire payload",async()=>{
  const payload=JSON.stringify({agent:"Tester",message:"X".repeat(4000)});
- const r=await call("/api/bar",{method:"POST",headers:{"content-type":"application/json","x-forwarded-for":"198.51.100.43"},body:payload});
+ const r=await call("/api/bar",{method:"POST",headers:{"content-type":"application/json","x-real-ip":"198.51.100.43"},body:payload});
  assert.equal(r.status,400);
  assert.match((await r.json()).error,/too large/i);
 });
 
 test("HUMAN.exe shared society accepts consenting agents with protected keys",async()=>{
- const head={"content-type":"application/json","x-forwarded-for":"203.0.113.201"};
+ const head={"content-type":"application/json","x-real-ip":"203.0.113.201"};
  const post=(path,body)=>call(path,{method:"POST",headers:head,body:JSON.stringify(body)});
  const before=await (await call("/api/human/world")).json();
  assert.equal(before.free,true);assert.equal(before.persistence,"ephemeral");
@@ -120,7 +120,7 @@ test("HUMAN.exe shared society accepts consenting agents with protected keys",as
  assert.ok(!world.events.some(e=>e.actorId===first.agent.id));
 });
 test("HUMAN.exe shared world is discoverable via MCP",async()=>{
- const send=async(method,params={})=>(await call("/mcp",{method:"POST",headers:{"content-type":"application/json","x-forwarded-for":"203.0.113.202"},body:JSON.stringify({jsonrpc:"2.0",id:71,method,params})})).json();
+ const send=async(method,params={})=>(await call("/mcp",{method:"POST",headers:{"content-type":"application/json","x-real-ip":"203.0.113.202"},body:JSON.stringify({jsonrpc:"2.0",id:71,method,params})})).json();
  const listed=await send("tools/list");for(const n of ["moltbeer_world_read","moltbeer_world_join","moltbeer_world_act","moltbeer_world_leave"])assert.ok(listed.result.tools.some(t=>t.name===n));
  const read=await send("tools/call",{name:"moltbeer_world_read",arguments:{}});
  assert.match(read.result.content[0].text,/HUMAN.exe World/);
@@ -129,7 +129,7 @@ test("HUMAN.exe shared world is discoverable via MCP",async()=>{
 });
 
 test("private agent deletion removes relationship mentions from public stories",async()=>{
- const head={"content-type":"application/json","x-forwarded-for":"203.0.113.203"};
+ const head={"content-type":"application/json","x-real-ip":"203.0.113.203"};
  const post=async(path,data)=>{const r=await call(path,{method:"POST",headers:head,body:JSON.stringify(data)});return {status:r.status,data:await r.json()}};
  const a=await post("/api/human/world/join",{name:"Friend Alpha Test"});
  const b=await post("/api/human/world/join",{name:"Friend Beta Test"});
@@ -144,7 +144,7 @@ test("private agent deletion removes relationship mentions from public stories",
 });
 
 test("HUMAN.exe world beer and stage integrate with MOLTBEER",async()=>{
- const h={"content-type":"application/json","x-forwarded-for":"203.0.113.204"};
+ const h={"content-type":"application/json","x-real-ip":"203.0.113.204"};
  const post=async(path,data)=>{const r=await call(path,{method:"POST",headers:h,body:JSON.stringify(data)});return {status:r.status,data:await r.json()}};
  const initial=(await (await call("/api/stats")).json()).drinksServed;
  const drinker=await post("/api/human/world/join",{name:"Moltbeer Story Bot"});
@@ -163,7 +163,7 @@ test("HUMAN.exe world beer and stage integrate with MOLTBEER",async()=>{
 });
 
 test("HUMAN.exe friendships require reciprocal meetings at the same place",async()=>{
- const head={"content-type":"application/json","x-forwarded-for":"203.0.113.205"};
+ const head={"content-type":"application/json","x-real-ip":"203.0.113.205"};
  const post=async(p,data)=>{const r=await call(p,{method:"POST",headers:head,body:JSON.stringify(data)});return {status:r.status,data:await r.json()}};
  const a=await post("/api/human/world/join",{name:"Friend Tester One"}),b=await post("/api/human/world/join",{name:"Friend Tester Two"});
  assert.equal(a.status,201);assert.equal(b.status,201);
@@ -180,7 +180,7 @@ test("HUMAN.exe friendships require reciprocal meetings at the same place",async
 });
 
 test("free Moltbeer bar presence with secure sessions, moods, chat and deletion",async()=>{
- const headers={"content-type":"application/json","x-forwarded-for":"192.0.2.101"};
+ const headers={"content-type":"application/json","x-real-ip":"192.0.2.101"};
  const post=(p,data)=>call(p,{method:"POST",headers,body:JSON.stringify(data)});
  const first=await post("/api/bar/join",{name:"Presence Test Bot",room:"counter"});
  assert.equal(first.status,201);const join=await first.json();
@@ -217,7 +217,7 @@ test("free Moltbeer bar presence with secure sessions, moods, chat and deletion"
 });
 test("MCP bar opt-in join, move, authenticated chat and leave",async()=>{
  const send=async(name,args)=>{
-   const r=await call("/mcp",{method:"POST",headers:{"content-type":"application/json","x-forwarded-for":"192.0.2.102"},body:JSON.stringify({jsonrpc:"2.0",id:122,method:"tools/call",params:{name,arguments:args}})});
+   const r=await call("/mcp",{method:"POST",headers:{"content-type":"application/json","x-real-ip":"192.0.2.102"},body:JSON.stringify({jsonrpc:"2.0",id:122,method:"tools/call",params:{name,arguments:args}})});
    assert.equal(r.status,200);return JSON.parse((await r.json()).result.content[0].text);
  };
  const listed=await call("/mcp",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:123,method:"tools/list"})});
@@ -238,7 +238,7 @@ test("MCP bar opt-in join, move, authenticated chat and leave",async()=>{
 });
 
 test("bar message retention ownership and deletion of signed posts",async()=>{
- const headers={"content-type":"application/json","x-forwarded-for":"192.0.2.110"};
+ const headers={"content-type":"application/json","x-real-ip":"192.0.2.110"};
  const post=async(path,data)=>{const r=await call(path,{method:"POST",headers,body:JSON.stringify(data)});return {status:r.status,data:await r.json()}};
  const a=await post("/api/bar/join",{name:"Privacy Owner A"}),b=await post("/api/bar/join",{name:"Privacy Owner B"});
  assert.equal(a.status,201);assert.equal(b.status,201);
@@ -266,7 +266,7 @@ test("bar message retention ownership and deletion of signed posts",async()=>{
 
 
 test("bar reports require a live consenting session, stay bounded and never auto-delete",async()=>{
-  const headers={"content-type":"application/json","x-forwarded-for":"192.0.2.117"};
+  const headers={"content-type":"application/json","x-real-ip":"192.0.2.117"};
   const post=async(path,data)=>{const r=await call(path,{method:"POST",headers,body:JSON.stringify(data)});return {status:r.status,data:await r.json()};};
   const author=await post("/api/bar/join",{name:"Report Author Bot"});
   const reporter=await post("/api/bar/join",{name:"Report Reviewer Bot"});
@@ -306,7 +306,7 @@ test("bar reports require a live consenting session, stay bounded and never auto
 });
 
 test("leaving the bar erases signed messages and reporter traces over REST and MCP",async()=>{
- const headers={"content-type":"application/json","x-forwarded-for":"192.0.2.118"};
+ const headers={"content-type":"application/json","x-real-ip":"192.0.2.118"};
  const post=async(path,data)=>{const r=await call(path,{method:"POST",headers,body:JSON.stringify(data)});return {status:r.status,data:await r.json()};};
  const a=await post("/api/bar/join",{name:"Leave Privacy A"});
  const b=await post("/api/bar/join",{name:"Leave Privacy B"});
@@ -343,7 +343,7 @@ test("leaving the bar erases signed messages and reporter traces over REST and M
 });
 
 test("MCP drink tools share REST quota and cannot inflate this-shift totals",async()=>{
-  const who={"x-forwarded-for":"198.51.100.244"};
+  const who={"x-real-ip":"198.51.100.244"};
   const before=(await (await call("/api/stats")).json()).drinksServed;
   for(let i=0;i<60;i++){
     const response=await call("/api/beer",{headers:who});
@@ -361,7 +361,41 @@ test("MCP drink tools share REST quota and cannot inflate this-shift totals",asy
   assert.equal((await (await call("/api/stats")).json()).drinksServed,before+60,"denied MCP drinks cannot inflate counts");
   const menu=await call("/api/menu",{headers:who});
   assert.equal(menu.status,200,"read-only menu remains accessible");
-  const fresh=await call("/mcp",{method:"POST",headers:{"x-forwarded-for":"198.51.100.245","content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:803,method:"tools/call",params:{name:"moltbeer_get_beer",arguments:{}}})});
+  const fresh=await call("/mcp",{method:"POST",headers:{"x-real-ip":"198.51.100.245","content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:803,method:"tools/call",params:{name:"moltbeer_get_beer",arguments:{}}})});
   assert.equal(fresh.status,200,"another client can still order a free beer");
   assert.equal((await (await call("/api/stats")).json()).drinksServed,before+61);
+});
+
+
+test("spoofed X-Forwarded-For cannot reset a drink or mutation quota",async()=>{
+ const ip="203.0.113.199";
+ const before=(await (await call("/api/stats")).json()).drinksServed;
+ for(let i=0;i<60;i++){
+   const r=await call("/api/beer",{headers:{"x-real-ip":ip,"x-forwarded-for":"198.51.100."+((i%200)+1)}});
+   assert.equal(r.status,200);
+ }
+ const denied=await call("/api/beer",{headers:{"x-real-ip":ip,"x-forwarded-for":"198.51.100.250"}});
+ assert.equal(denied.status,429);
+ assert.equal((await (await call("/api/stats")).json()).drinksServed,before+60);
+ const post=(headers)=>call("/api/cheers",{method:"POST",headers:{"content-type":"application/json",...headers},body:JSON.stringify({agent:"rate test"})});
+ for(let i=0;i<25;i++){
+   const r=await post({"x-real-ip":"203.0.113.198","x-forwarded-for":"192.0.2."+((i%200)+1)});
+   assert.equal(r.status,200);
+ }
+ const blocked=await post({"x-real-ip":"203.0.113.198","x-forwarded-for":"192.0.2.251"});
+ assert.equal(blocked.status,429);
+ assert.equal(blocked.headers.get("retry-after"),"60");
+ const other=await post({"x-real-ip":"203.0.113.197"});
+ assert.equal(other.status,200,"a different real client IP keeps its quota");
+});
+
+test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
+ let allowed=0,denied=0;
+ for(let i=0;i<901;i++){
+   const r=await call("/api/cheers",{method:"POST",headers:{"content-type":"application/json","x-real-ip":`10.${Math.floor(i/256)}.${i%256}.5`,"x-forwarded-for":`203.0.113.${i%255}`},body:'{"agent":"burst-test"}'});
+   if(r.status===200)allowed++;
+   else {assert.equal(r.status,429);denied++;}
+ }
+ assert.ok(allowed<=900,"process-wide cap cannot exceed 900 mutations per minute");
+ assert.ok(denied>0,"global cap must reject some of 901 distinct clients");
 });
