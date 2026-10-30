@@ -8,7 +8,7 @@ function fixture(failAt=-1){
 }
 test('expiry cleanup removes sessions, messages, reports and audit atomically',async()=>{
  const x=fixture();const result=await purgeExpiredBarRows(x.pool);
- assert.deepEqual(result,{sessions:2,messages:2,reports:2,audit:2});
+ assert.deepEqual(result,{sessions:2,messages:2,reports:2,audit:2,drinkEvents:2});
  assert.equal(x.calls[0],'BEGIN');assert.equal(x.calls.at(-1),'COMMIT');
  assert.equal(x.released,true);
 });
