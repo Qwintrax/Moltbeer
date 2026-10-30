@@ -30,7 +30,7 @@ async function transaction(pool,fn){
   return value;
  }catch(err){
   if(begun)try{await client.query('ROLLBACK')}catch{}
-  if(err?.code==='BAR_INPUT'||err?.code==='BAR_IDENTITY')throw err;
+  if(err?.code==='BAR_INPUT'||err?.code==='BAR_IDENTITY'||err?.code==='BAR_CAPACITY')throw err;
   throw Error('Durable bar transaction failed');
  }finally{if(client)client.release()}
 }
