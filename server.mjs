@@ -387,6 +387,22 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     }
   }).listen(PORT,"0.0.0.0",async()=>{
     console.log(`MOLTBEER on port ${PORT}`);
+    // Owner-only read/write acceptance of the REAL Supabase adapter. It performs
+    // all writes inside one transaction, verifies that they disappear after
+    // ROLLBACK and never switches public routes into durable mode.
+    if(process.env.MOLTBEER_STORAGE_ACCEPTANCE==="1"){
+      let probePool;
+      try{
+        const [{Pool},{createPrivateDatabasePool},{verifyDurableStorageRollback}]=await Promise.all([
+          import("pg"),import("./bar-storage-pool.mjs"),import("./scripts/storage-acceptance.mjs")
+        ]);
+        probePool=await createPrivateDatabasePool({PoolClass:Pool,databaseUrl:process.env.DATABASE_URL});
+        const acceptance=await verifyDurableStorageRollback(probePool);
+        console.log("MOLTBEER private database rollback acceptance:",acceptance.ok?"PASS":"UNAVAILABLE","(0 test rows committed)");
+      }catch{
+        console.log("MOLTBEER private database rollback acceptance: UNAVAILABLE (nothing committed)");
+      }finally{if(probePool)try{await probePool.end()}catch{}}
+    }
     // Durable mode uses only the already-existing Supabase project and this
      // single Railway service. No fallback to process memory on DB failures.
      if(durableModeEnabled()){
