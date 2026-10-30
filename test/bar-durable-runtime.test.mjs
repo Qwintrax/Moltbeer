@@ -93,3 +93,14 @@ test('MCP durable drink requires successful transaction before producing beverag
  assert.ok(calls.some(s=>s==='COMMIT'));
  assert.ok(durableMcpNames.has('moltbeer_get_beer'));
 });
+
+
+test('MCP durable bar_say never downgrades to unverified guest when its key is missing',async()=>{
+ const pool={connect:async()=>{throw Error('Guest chat must never be invoked')}};
+ for(const input of [{},{id:'session'},{key:'secret'},{id:'',key:'secret'}]){
+  const result=await runDurableBarAction(pool,'moltbeer_bar_say',input);
+  assert.equal(typeof result.error,'string');
+  assert.match(result.error,/session/i);
+  assert.equal(result.ok,undefined);
+ }
+});
