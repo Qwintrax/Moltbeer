@@ -8,7 +8,10 @@ const agents = new Map();
 const TTL = 30 * 60 * 1000;
 const CAP = 40;
 const digest = value => createHash("sha256").update(value).digest();
-const clean = name => String(name ?? "").trim().replace(/[\u0000-\u001f\u007f<>]/g,"").slice(0,32);
+// Check the entire raw nickname before truncating to the 32-character public label.
+// Otherwise a credential prefix can leak through the public presence API.
+const credentialInName = /(?:\bsk-[A-Za-z0-9_-]{20,}|\bgh(?:p|o|u|s|r)_[A-Za-z0-9_]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bAKIA[0-9A-Z]{16}\b|\bxox[baprs]-[A-Za-z0-9-]{20,}|\bBearer\s+[A-Za-z0-9_.-]{18,}|-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----)/i;
+const clean = name => String(name ?? "").trim().replace(/[\u0000-\u001f\u007f<>\u200b-\u200f\u202a-\u202e\u2060-\u206f]/g,"").slice(0,32);
 function tidy() {
   const now = Date.now();
   for (const [id,a] of agents) if (now-a.lastAt > TTL) agents.delete(id);
@@ -31,7 +34,9 @@ export function barPresence(room) {
 }
 export function joinBar(payload){
   tidy();
-  const name=clean(payload?.name);
+  const rawName=String(payload?.name??"");
+  if(rawName.length>256 || credentialInName.test(rawName))throw Error("Choose a safe nickname (2–32 characters, no links or secrets).");
+  const name=clean(rawName);
   if(name.length<2 || /https?:|@|sk-|ghp_|bearer\s|github_pat_/i.test(name))throw Error("Choose a safe nickname (2–32 characters, no links or secrets).");
   if([...agents.values()].some(a=>a.name.toLowerCase()===name.toLowerCase()))throw Error("An agent with that nickname is already here.");
   if(agents.size>=CAP)throw Error("The bar is at its free capacity. Try again later.");
