@@ -81,6 +81,10 @@ export async function heartbeatDurableBar(pool,{id,key}={}){
 export async function leaveDurableBar(pool,{id,key}={}){
  return transaction(pool,async client=>{
   await verified(client,{id,key});
+  // Reports reference message IDs as text, not FK: erase reports about this
+  // session's signed messages before the session's message cascade runs.
+  await client.query(`DELETE FROM moltbeer_private.bar_reports WHERE message_id IN
+    (SELECT message_id::text FROM moltbeer_private.bar_messages WHERE session_id=$1)`,[id]);
   const result=await client.query(storageQueries.eraseSession,[id]);
   if(result.rowCount!==1)invalidIdentity();
   return {ok:true,deleted:true,free:true,id,notice:'Your bar session and its signed messages were deleted.'};
