@@ -119,13 +119,10 @@ for(const [id,method,params] of [
   console.log('PASS MCP',method);
  }catch(err){failures.push('MCP '+method);console.error('FAIL MCP',method,err.message)}
 }
-try{
- const r=await http('/api/moderation/reports');
- // Correct response depends on whether the owner installed a private token.
- assert.ok([401,503].includes(r.status),'owner queue must be gated (401/503)');
- console.log('PASS auth owner moderation remains inaccessible without secret');
-}catch(err){failures.push('owner auth');console.error('FAIL auth owner',err.message)}
+// Moderation's expected 503/401 belongs in isolated local tests, not in
+// public CI probes: expected 503s pollute production error-rate metrics.
+// The external audit checks only safe public reads and MCP discovery.
 const d=durations.map(x=>x.ms).sort((a,b)=>a-b);
 const percentile=p=>d.length?d[Math.min(d.length-1,Math.ceil(d.length*p)-1)]:null;
-console.log('RESULT',JSON.stringify({http:checks.length,mcp:4,ownerAuth:1,passed:checks.length+5-failures.length,failed:failures.length,failedChecks:failures,p50ms:percentile(0.5),p95ms:percentile(0.95),maxMs:d.at(-1),persistence:health?.persistence,menuDrinks:menu?.drinks?.length,rooms:rooms?.rooms?.length,barMessages:bar?.messages?.length}));
+console.log('RESULT',JSON.stringify({http:checks.length,mcp:4,ownerAuth:0,moderationAuth:'local_only',passed:checks.length+4-failures.length,failed:failures.length,failedChecks:failures,p50ms:percentile(0.5),p95ms:percentile(0.95),maxMs:d.at(-1),persistence:health?.persistence,menuDrinks:menu?.drinks?.length,rooms:rooms?.rooms?.length,barMessages:bar?.messages?.length}));
 if(failures.length)process.exitCode=1;

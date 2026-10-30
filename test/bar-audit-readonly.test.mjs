@@ -2,6 +2,7 @@
 // this suite exercises fetchApp only in the isolated Node CI process.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {fetchApp} from '../server.mjs';
 
 const base='http://localhost';
@@ -148,6 +149,17 @@ test('audit: unconfigured owner moderation fails closed and does not reveal repo
   assert.equal(r.status,503);
   assert.equal(r.data?.reports,undefined);
  }
+});
+
+test('audit: public CI probe does not manufacture expected moderation 503s',async()=>{
+ const remote=readFileSync(new URL('../scripts/audit-remote-readonly.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(remote,/http\(\s*['"]\/api\/moderation\//);
+ assert.match(remote,/ownerAuth:0,moderationAuth:'local_only'/);
+ // The 503/401 security contract is tested against the isolated in-process
+ // application, never by repeatedly calling the live production endpoint.
+ const local=await request('/api/moderation/reports');
+ if(!process.env.MOLTBEER_ADMIN_TOKEN)assert.equal(local.status,503);
+ else assert.equal(local.status,401);
 });
 
 test('audit: unknown paths and wrong methods cannot trigger writes',async()=>{
