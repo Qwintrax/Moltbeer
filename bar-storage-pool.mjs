@@ -14,7 +14,13 @@ export function validatePrivateDatabaseUrl(value,projectId='nbjhjnswqmpcpbsvbwff
       [...u.searchParams.keys()].some(k=>k!=='sslmode') ||
       u.searchParams.get('sslmode')!=='require')
     throw Error('Database target is not the dedicated Supabase session pooler');
-  return value;
+  // Node-postgres parses sslmode from a connection string and can override
+  // ssl.rejectUnauthorized. Remove that option *after* validating it and pass
+  // a strict TLS config separately. Keep the password percent-encoded.
+  if (decodeURIComponent(u.password)==='[YOUR-PASSWORD]' || decodeURIComponent(u.password).length<8)
+    throw Error('Invalid database configuration');
+  u.searchParams.delete('sslmode');
+  return u.toString();
 }
 export async function createPrivateDatabasePool({
   databaseUrl=process.env.DATABASE_URL,
