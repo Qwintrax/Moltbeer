@@ -24,3 +24,11 @@ jobs:
           MOLTBEER_BASE_URL: https://moltbeer-free-bar-api-production.up.railway.app
           MOLTBEER_EXPECTED_PERSISTENCE: ephemeral
         run: node scripts/smoke-readonly.mjs
+      - name: Comprehensive read-only public API/MCP audit (non-blocking)
+        if: github.event_name == 'push'
+        continue-on-error: true
+        timeout-minutes: 4
+        env:
+          MOLTBEER_BASE_URL: https://moltbeer-free-bar-api-production.up.railway.app
+          MOLTBEER_EXPECTED_PERSISTENCE: ephemeral
+        run: node scripts/audit-remote-readonly.mjs
