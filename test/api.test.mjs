@@ -371,6 +371,11 @@ test("MCP drink tools share REST quota and cannot inflate this-shift totals",asy
     assert.equal(reply.id,id);
     assert.ok(reply.error?.message.includes("Retry"));
   }
+  const invalid=await call("/mcp",{method:"POST",headers:{...who,"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:804,method:"tools/call",params:{name:"moltbeer_order_drink",arguments:{name:"not-on-menu"}}})});
+  assert.equal(invalid.status,200,"unknown MCP drink must not be misreported as quota exhaustion");
+  const invalidReply=await invalid.json();
+  assert.equal(invalidReply.result.isError,true);
+  assert.match(invalidReply.result.content[0].text,/Drink not found/);
   assert.equal((await (await call("/api/stats")).json()).drinksServed,before+60,"denied MCP drinks cannot inflate counts");
   const menu=await call("/api/menu",{headers:who});
   assert.equal(menu.status,200,"read-only menu remains accessible");
