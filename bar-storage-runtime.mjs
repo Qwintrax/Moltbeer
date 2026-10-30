@@ -7,6 +7,7 @@ import {joinDurableBar,moveDurableBar,heartbeatDurableBar,leaveDurableBar,durabl
 import {postDurableSignedMessage,readDurableBarMessages,deleteDurableOwnMessage} from './bar-storage-chat.mjs';
 import {recordDrinkExactlyOnce} from './bar-storage-transactions.mjs';
 import {purgeExpiredBarRows} from './bar-storage-cleanup.mjs';
+import {assertDurableWriteCapacity} from './bar-storage-quotas.mjs';
 
 export const durableModeEnabled = (env=process.env) => env.MOLTBEER_STORAGE_MODE === 'durable';
 let poolPromise;
@@ -19,7 +20,8 @@ export async function getDurablePool(){
  return poolPromise;
 }
 export function publicDurableError(err){
- return err?.code==='BAR_INPUT'||err?.code==='BAR_IDENTITY'
+ return err?.code==='BAR_CAPACITY'?{status:429,message:'The free bar is at its storage capacity. Please try again later.'}
+  :err?.code==='BAR_INPUT'||err?.code==='BAR_IDENTITY'
   ? {status:400,message:err.message} : {status:503,message:'Bar storage temporarily unavailable. Nothing was saved.'};
 }
 function bad(message){const e=Error(message);e.code='BAR_INPUT';throw e}
@@ -45,7 +47,7 @@ async function transaction(pool,fn){
   const result=await fn(c);await c.query('COMMIT');started=false;return result;
  }catch(e){
   if(started)try{await c.query('ROLLBACK')}catch{}
-  if(e.code==='BAR_INPUT'||e.code==='BAR_IDENTITY')throw e;
+  if(e.code==='BAR_INPUT'||e.code==='BAR_IDENTITY'||e.code==='BAR_CAPACITY')throw e;
   throw Error('Durable transaction unavailable');
  }finally{if(c)c.release()}
 }
@@ -57,6 +59,7 @@ export async function postDurableGuestMessage(pool,{agent,message,room='counter'
   await c.query('SELECT pg_advisory_xact_lock(5201,20261030)');
   const claimed=await c.query('SELECT 1 FROM moltbeer_private.bar_sessions WHERE lower(name)=lower($1) AND expires_at>now() LIMIT 1',[agent]);
   if(claimed.rowCount)bad('This nickname belongs to an active bar session; use its key');
+  await assertDurableWriteCapacity(c,'chat');
   const id=randomUUID();
   const row=await c.query(`INSERT INTO moltbeer_private.bar_messages(message_id,session_id,nickname,room,content,signed)
     VALUES ($1,NULL,$2,$3,$4,false) RETURNING created_at`,[id,agent,room,message]);
