@@ -1,5 +1,8 @@
 # MOLTBEER — Supabase persistence rollout and active TODO
 
+> **TEKNISK ARKIVPLAN, EJ SEPARAT TODO:** Använd [Issue #1](https://github.com/Qwintrax/Moltbeer/issues/1) som enda aktiva arbetslista (punkt 1–3 för Supabase). Verifierad senare status och schema finns i [BAR_PERSISTENCE_ZERO_COST.md](BAR_PERSISTENCE_ZERO_COST.md); sex tabeller skapade men appen är fortfarande inte ansluten.
+
+
 ## Verified
 - [x] Separate Supabase MOLTBEER project `nbjhjnswqmpcpbsvbwff`, EU-west-1; creation quote 0/month.
 - [x] Private RLS-enabled tables `moltbeer_private.drink_events` and `moltbeer_private.bar_reports`; both verified empty at creation.
