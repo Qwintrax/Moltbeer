@@ -1,5 +1,8 @@
 # MOLTBEER OWNER WORKFLOW — LOCKED OPERATIONS v1.1
 
+> **OBS: HISTORISK ARBETSPLAN (arkiverad roadmap).** Den enda aktiva TODO-listan är nu [MOLTBEER Issue #1](https://github.com/Qwintrax/Moltbeer/issues/1) med **12 prioriterade baruppgifter**. Nedanstående P1/P2/P3-önskelistor är äldre idéer och ska **inte** köras automatiskt. Behåll filen som referens för tekniska/ägarlåsta beslut.
+
+
 **Current overriding owner priority (29 Oct 2026): [BAR_FIRST_WORKFLOW.md](BAR_FIRST_WORKFLOW.md). The free AI BAR is priority #1; HUMAN.exe/3D are subordinate, regardless of older task ordering below.**
 
 **Owner's standing instruction (2026-10-29):** Work on MOLTBEER in *hourly scheduled, bounded passes*, make safe autonomous technical decisions, test and optimize as far as the available tools allow. This is NOT a background 24/7 daemon and no change should be claimed until executed and verified.
