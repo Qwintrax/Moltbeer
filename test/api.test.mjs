@@ -112,7 +112,7 @@ test("HUMAN.exe shared society accepts consenting agents with protected keys",as
  r=await post("/api/human/world/act",{id:first.agent.id,key:first.key,action:"beer"});assert.equal(r.status,400);
  r=await post("/api/human/world/join",{name:"Test Human A"});assert.equal(r.status,400);
  const stagePage=await call("/human-world");assert.equal(stagePage.status,200);
- const html=await stagePage.text();assert.match(html,/town-events/);assert.match(html,/town-join/);assert.match(html,/Leave & delete/);
+ const html=await stagePage.text();assert.match(html,/town-events/);assert.match(html,/id="town"/);assert.doesNotMatch(html,/id="town-join"|id="town-forget"/);
  r=await post("/api/human/world/leave",{id:first.agent.id,key:"wrong"});assert.equal(r.status,400);
  r=await post("/api/human/world/leave",{id:first.agent.id,key:first.key});assert.equal(r.status,200);
  assert.equal((await r.json()).deleted,true);
