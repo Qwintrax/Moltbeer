@@ -649,6 +649,15 @@ test("Kenney Tiny Town public route includes authentic free tiles and only real 
  const sitemap=await (await call("/sitemap.xml")).text();
  assert.match(sitemap,/\/city/);
 });
+test("privacy page discloses actual ephemeral retention, rights and no imaginary database",async()=>{
+ const r=await call("/privacy");assert.equal(r.status,200);
+ const html=await r.text();
+ for(const phrase of ["Privacy, consent & safety","30 minutes","24 hours","server memory only","not active until an owner secret","THIS SHIFT","/api/bar/leave","/api/bar/message/delete","/api/bar/message/report","does not yet save its live sessions"])assert.ok(html.includes(phrase),"privacy disclosure missing: "+phrase);
+ assert.doesNotMatch(html,/(?:we never log IP addresses|permanently retained forever|all data deleted worldwide)/i);
+ const normal=await (await call("/bar")).text();assert.match(normal,/href="\/privacy"/);
+ const site=await (await call("/sitemap.xml")).text();assert.match(site,/\/privacy/);
+ const health=(await (await call("/health")).json());assert.equal(health.persistence,"ephemeral");
+});
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
