@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {containsBarCredential} from './bar-presence.mjs';
 import {withDurableBarSession} from './bar-storage-presence.mjs';
 import {storageQueries} from './bar-storage-queries.mjs';
+import {assertDurableWriteCapacity} from './bar-storage-quotas.mjs';
 
 // Prepared only: the public REST/MCP routes still use their existing ephemeral
 // implementation until a real Railway -> Supabase roundtrip and restart test.
@@ -29,6 +30,7 @@ export async function postDurableSignedMessage(pool,{id,key,message}={}){
   const renewed=await client.query(storageQueries.updatePresence,
     [id,session.room,session.spot,session.mood]);
   if(renewed.rowCount!==1)bad('Invalid or expired bar identity');
+  await assertDurableWriteCapacity(client,'chat');
   const messageId=randomUUID();
   const result=await client.query(storageQueries.insertMessage,
     [messageId,id,session.name,session.room,content,true]);
