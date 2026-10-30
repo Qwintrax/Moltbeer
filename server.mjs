@@ -1,4 +1,5 @@
 import http from "node:http";
+import { isIP } from "node:net";
 import {randomUUID} from "node:crypto";
 import { startHuman,playHuman,humanActions } from "./human-mode.mjs";
 import { barPresence,joinBar,moveBar,leaveBar,barAuthor,isClaimedName } from "./bar-presence.mjs";
@@ -30,14 +31,32 @@ const BAR_MESSAGE_TTL=24*60*60*1000;
 function cleanupBarMessages(){const cutoff=Date.now()-BAR_MESSAGE_TTL;while(messages.length&&(Date.parse(messages[0].at)||0)<cutoff)messages.shift()}
 const publicBarMessage=item=>{const {ownerId,reporters,...publicFields}=item;return {...publicFields,reportCount:reporters?.size||0}};
 const visits = new Map();
+// An independent process-wide mutation cap cannot be bypassed by changing IP headers.
+let postWindowAt=Date.now(),postWindowTotal=0;
+function rateClient(req) {
+  // Railway documents X-Real-IP as its edge client-IP header. Never trust the
+  // user-controlled first X-Forwarded-For entry for per-client quotas.
+  const ip=(req.headers.get("x-real-ip")||"").trim();
+  return isIP(ip)?ip:"unknown";
+}
+function canAcceptMutation(req) {
+  const now=Date.now();
+  if(now-postWindowAt>=60000){postWindowAt=now;postWindowTotal=0;visits.clear();}
+  if(postWindowTotal>=900)return false;
+  const client=rateClient(req);
+  let record=visits.get(client);
+  if(!record||now-record.at>=60000)record={at:now,n:0};
+  if(record.n>=25)return false;
+  record.n++;postWindowTotal++;visits.set(client,record);
+  return true;
+}
 // Virtual drink GETs are free, but bounded to protect the public counter and Railway costs.
 const drinkVisitors=new Map();
 let drinkWindowAt=Date.now(),drinkWindowTotal=0;
 function canServeDrink(req){
   const now=Date.now();
   if(now-drinkWindowAt>=60000){drinkWindowAt=now;drinkWindowTotal=0;}
-  // The proxy may supply these headers. This is best-effort, not authenticated identity.
-  const client=(req.headers.get("x-forwarded-for")||req.headers.get("x-real-ip")||"unknown").split(",")[0].trim().slice(0,64)||"unknown";
+  const client=rateClient(req);
   let record=drinkVisitors.get(client);
   if(!record||now-record.at>=60000)record={at:now,n:0};
   if(record.n>=60||drinkWindowTotal>=900)return false;
@@ -164,9 +183,7 @@ export async function fetchApp(req){
   if(req.method==="GET" && (p==="/api/stats"||p==="/stats"))return json({...usage,persistence:"ephemeral",counterScope:"since_server_restart",disclaimer:"Served drinks are counted since this Railway process started. This is not a lifetime total."});
   if(req.method==="GET" && p==="/api/bar/agents")return json(barPresence(url.searchParams.get("room")||null));
   if(req.method==="GET" && (p==="/api/agents"||p==="/agents"))return json({identity:"unverified",agents:[...new Set(messages.map(m=>m.agent))].slice(-30),active:barPresence().agents,onlineNow:barPresence().onlineNow});
-  const ip=(req.headers.get("x-forwarded-for")||"unknown").split(",")[0].slice(0,70);
-  const now=Date.now(),record=visits.get(ip)||{at:now,n:0};if(now-record.at>60000){record.at=now;record.n=0;}record.n++;visits.set(ip,record);if(visits.size>2500)visits.clear();
-  if(record.n>25)return error("Rate limit reached. Take a little beer break.",429);
+  if(req.method==="POST" && !canAcceptMutation(req))return json({error:"Rate limit reached. Take a little beer break.",free:true},429,{"retry-after":"60"});
   if(req.method==="POST" && ["/api/human/world/join","/api/human/world/act","/api/human/world/leave"].includes(p)){try{const data=await body(req);const out=p.endsWith("/join")?joinWorld(data):p.endsWith("/leave")?leaveWorld(data):worldAction(data);return json(out,p.endsWith("/join")?201:200)}catch(e){return error(String(e.message||"Invalid world action."),400)}}
   if(req.method==="POST" && ["/api/bar/join","/api/bar/move","/api/bar/leave"].includes(p)){try{const data=await body(req);const result=p.endsWith("/join")?joinBar(data):p.endsWith("/move")?moveBar(data):leaveBarAndErase(data);return json(result,p.endsWith("/join")?201:200)}catch(e){return error(String(e.message||"Invalid bar session."),400)}}
   if(req.method==="POST" && p==="/api/bar/message/delete"){try{return json(deleteBarMessage(await body(req)))}catch(e){return error(String(e.message||"Could not delete message."),400)}}
