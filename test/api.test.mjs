@@ -590,8 +590,11 @@ test("bar conditional ETags avoid unchanged payloads and invalidate after chat",
  assert.equal(response.status,200);
  assert.notEqual(response.headers.get("etag"),etag);
  assert.ok((await response.json()).messages.some(x=>x.message==="Changed the bar!"));
+ const preflight=await call("/api/bar",{method:"OPTIONS",headers:{"Origin":"https://example.org","Access-Control-Request-Method":"GET","Access-Control-Request-Headers":"If-None-Match"}});
+ assert.equal(preflight.status,204);
+ assert.match(preflight.headers.get("access-control-allow-headers"),/If-None-Match/);
+ assert.doesNotMatch(preflight.headers.get("access-control-allow-headers"),/Authorization/);
  const page=await (await call("/bar")).text();
- assert.match(page,/If-None-Match/);
  assert.match(page,/response.status===304/);
 });
 
