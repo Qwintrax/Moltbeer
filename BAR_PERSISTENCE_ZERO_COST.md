@@ -66,3 +66,17 @@ Updated 2026-10-30 (15:50 CET). **Dedicated Supabase Free project and private sc
 - Added migration `bar_unique_agent_nickname_for_concurrent_joins` (unique lowercase nickname index) and a private transactional opt-in presence adapter. Joins serialize using a transaction advisory lock and enforce the 40-seat cap. Adapter remains **unwired** to public endpoints.
 - Ran real Supabase SQL inside explicit `BEGIN ... ROLLBACK` transactions: drink event + metric insert, session insert/move, signed message/report insertion and cascading session deletion. Follow-up counts confirmed all six private tables remain at zero rows. **This tests database schema semantics, not the Railway connection or server restart.**
 - Remaining release gates: install/verify driver in CI, connect the adapter to the public API with graceful 503 on outage, verify a real private Railway DB roundtrip and restart, complete chat/report/moderation retention and deletion, verify cost caps and real external client/browser tests. Do not merge or advertise durable status before those gates pass.
+
+## Safe URL diagnostics (prepared in PR #13; not deployed until CI and merge)
+
+The private startup preflight returns only a **fixed category**, never the URL, username, password, DNS response or PostgreSQL exception. Categories after the change:
+
+- `missing_password`: use a real private database password, not `[YOUR-PASSWORD]` or a short placeholder.
+- `wrong_project_or_pooler`: copy the **Session pooler**, port **5432**, region **eu-west-1**, dedicated project `nbjhjnswqmpcpbsvbwff` from Supabase Connect.
+- `tls_required_or_unexpected_options`: URL must contain exactly `?sslmode=require`; remove other query options.
+- `malformed` / `malformed_password_encoding`: copy a valid PostgreSQL URL; percent-encode reserved characters in the password.
+- `connection_failed`: URL syntax passed but network, credentials or TLS handshake failed; investigate privately, do not print driver errors.
+- `schema_incomplete`: a private read-only connection succeeded but all six expected tables were not visible.
+
+**Owner-only steps:** In Railway's existing production service, replace the private `DATABASE_URL` using Supabase's **Connect → Session pooler** string, inserting the actual password in Railway Variables. Never paste it into GitHub, a chat, or a browser URL. Keep `MOLTBEER_STORAGE_PREFLIGHT=1`; after Railway redeploy, inspect deploy logs for `PASS ok` (read-only). This alone does **not** enable durable mode. Before any live database writes, verify Free plan/charges, end-to-end signed session and chat writes, privacy erasure, cleanup, restart persistence and graceful outages. Do not alter the production topology or provision services.
+
