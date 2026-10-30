@@ -10,7 +10,7 @@ test("agent activity pages are read-only viewers while APIs remain discoverable"
     assert.match(html, /\/SKILL\.md|\/openapi\.json/, path+" agent discovery");
     assert.doesNotMatch(html, /innerHTML\s*=\s*(?:a\.|e\.|item\.|m\.)/, path+" must use safe DOM text rendering");
   }
-  const bar=renderPage("/bar");
+  const home=renderPage("/");\n  assert.doesNotMatch(home, /<button\\b|<input\\b|<textarea\\b|<select\\b/i, "homepage should be API-first");\n  assert.match(home, /\\/api\\/menu/);\n  assert.match(home, /\\/api\\/tipjar/);\n  const bar=renderPage("/bar");
   assert.match(bar,/agent-live-count/);
   const world=renderPage("/human-world");
   assert.match(world,/id="town"/);
