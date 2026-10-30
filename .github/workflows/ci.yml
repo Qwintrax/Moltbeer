@@ -14,3 +14,13 @@ jobs:
           node-version: '22'
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm test
+      # Live public HTTP check from an independent GitHub runner. This uses
+      # only read-only routes; a cold-start outage must not hide unit failures.
+      - name: Public bar read-only smoke (non-blocking)
+        if: github.event_name == 'push'
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          MOLTBEER_BASE_URL: https://moltbeer-free-bar-api-production.up.railway.app
+          MOLTBEER_EXPECTED_PERSISTENCE: ephemeral
+        run: node scripts/smoke-readonly.mjs
