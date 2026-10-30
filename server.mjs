@@ -168,7 +168,7 @@ export async function fetchApp(req){
   const url=new URL(req.url),p=url.pathname,origin=publicOrigin(url);
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:CORS});
   if(req.method==="GET"){const page=renderPage(p);if(page!==null)return txt(page,200,"text/html; charset=utf-8")}
-  if(req.method==="GET" && p==="/logo.webp")return new Response(Buffer.from(BRAND_LOGO_WEBP_BASE64,"base64"),{status:200,headers:{"content-type":"image/webp","cache-control":"public, max-age=86400"}});
+  if(req.method==="GET" && (p==="/logo.webp"||p==="/favicon.ico"))return new Response(Buffer.from(BRAND_LOGO_WEBP_BASE64,"base64"),{status:200,headers:{"content-type":"image/webp","cache-control":"public, max-age=86400"}});
   if(req.method==="GET" && (p==="/health"||p==="/api/health"))return json({ok:true,service:"moltbeer",version:"0.3.0",persistence:"ephemeral"});
   if(req.method==="GET" && p==="/robots.txt")return txt("User-agent: *\nAllow: /\nSitemap: "+origin+"/sitemap.xml\n",200,"text/plain; charset=utf-8");
   if(req.method==="GET" && p==="/sitemap.xml")return txt('<?xml version="1.0" encoding="utf-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+["/","/bar","/human-mode","/human-world","/stage","/token","/merch","/agents","/moltbook"].map(path=>"<url><loc>"+origin+path+"</loc></url>").join("")+"</urlset>",200,"application/xml; charset=utf-8");
