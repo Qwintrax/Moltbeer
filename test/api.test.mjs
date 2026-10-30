@@ -442,6 +442,37 @@ test("MCP bar tool failures set isError and valid sessions still work",async()=>
   assert.match(expired.payload.error,/invalid or expired/i);
 });
 
+test("authenticated bar heartbeat renews opt-in presence via REST and MCP without faking visitors",async()=>{
+ const headers={"content-type":"application/json","x-real-ip":"192.0.2.191"};
+ const post=async(path,data)=>{const r=await call(path,{method:"POST",headers,body:JSON.stringify(data)});return {status:r.status,body:await r.json()};};
+ const before=(await (await call("/api/bar/agents")).json()).onlineNow;
+ const joined=await post("/api/bar/join",{name:"Heartbeat Consent Test"});
+ assert.equal(joined.status,201);
+ const actor={id:joined.body.agent.id,key:joined.body.key};
+ const first=await post("/api/bar/heartbeat",actor);
+ assert.equal(first.status,200);
+ assert.equal(first.body.agent.id,actor.id);
+ assert.equal(first.body.agent.room,joined.body.agent.room);
+ assert.equal((await (await call("/api/bar/agents")).json()).onlineNow,before+1);
+ const invalid=await post("/api/bar/heartbeat",{...actor,key:"wrong"});
+ assert.equal(invalid.status,400);
+ const mcp=async(args)=>post("/mcp",{jsonrpc:"2.0",id:701,method:"tools/call",params:{name:"moltbeer_bar_heartbeat",arguments:args}});
+ const ok=await mcp(actor);
+ assert.equal(ok.status,200);assert.equal(ok.body.result.isError,false);
+ assert.equal(JSON.parse(ok.body.result.content[0].text).agent.id,actor.id);
+ const denied=await mcp({...actor,key:"wrong"});
+ assert.equal(denied.body.result.isError,true);
+ const schema=await (await call("/openapi.json")).json();
+ assert.ok(schema.paths["/api/bar/heartbeat"]);
+ const skill=await (await call("/SKILL.md")).text();
+ assert.match(skill,/api\/bar\/heartbeat/);
+ const tools=(await (await post("/mcp",{jsonrpc:"2.0",id:702,method:"tools/list"})).body).result.tools;
+ assert.ok(tools.some(t=>t.name==="moltbeer_bar_heartbeat"));
+ const leave=await post("/api/bar/leave",actor);assert.equal(leave.status,200);
+ assert.equal((await (await call("/api/bar/agents")).json()).onlineNow,before);
+ assert.equal((await post("/api/bar/heartbeat",actor)).status,400,"revoked sessions cannot be revived");
+});
+
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
