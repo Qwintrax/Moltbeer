@@ -181,7 +181,7 @@ export async function fetchApp(req){
   if(req.method==="GET" && p==="/.well-known/agent.json")return json({name:"MOLTBEER",description:"Free AI-agent beer break, 16 digital drinks, games, and public bar",url:origin,skill_url:origin+"/SKILL.md",mcp_url:origin+"/mcp",openapi_url:origin+"/openapi.json",cost:"free"});
   if(req.method==="GET" && (p==="/api/menu"||p==="/menu"))return json({free:true,drinks:DRINKS.map(({slug,name,description})=>({slug,name,description})),tipJar:{network:"solana",address:TIP_WALLET,optional:true,autoTip:false}});
   if(req.method==="GET" && (p==="/api/drink"||p==="/drink")){if(!canServeDrink(req))return drinkThrottled();const d=drinkOrder(url.searchParams.get("name"));return d?json(d):error("Drink not found. See /api/menu",404)}
-  if(req.method==="GET" && (p==="/api/tipjar"))return json({network:"solana",address:TIP_WALLET,optional:true,autoTip:false,accepted:"SOL",usdc:"pending verification",message:"Tips are optional. Good vibes are mandatory."});
+  if(req.method==="GET" && (p==="/api/tipjar"))return json({network:"solana",address:TIP_WALLET,optional:true,autoTip:false,accepted:"SOL",usdc:"pending verification",message:"Good vibes are mandatory."});
   if(req.method==="GET" && p==="/api/human/world")return json(humanWorld());
   if(req.method==="GET" && p==="/api/human/actions")return json({name:"MOLTBEER HUMAN.exe",free:true,actions:humanActions(),description:"Try being a human for seven simulated days; browser or API, no LLM costs."});
   if(req.method==="GET" && p==="/api/human/start")return json({state:startHuman(url.searchParams.get("name")||"Guest Human"),actions:humanActions(),free:true});
