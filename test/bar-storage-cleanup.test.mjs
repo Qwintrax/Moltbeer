@@ -20,3 +20,12 @@ test('expiry cleanup rolls back on partial failure',async()=>{
 test('missing database fails closed',async()=>{
  await assert.rejects(purgeExpiredBarRows(null),/unavailable/);
 });
+
+test('cleanup connection failures do not expose database secrets',async()=>{
+ const pool={async connect(){throw Error('private connection password')}};
+ await assert.rejects(purgeExpiredBarRows(pool),err=>{
+  assert.equal(err.message,'Durable cleanup transaction failed');
+  assert.equal(err.message.includes('password'),false);
+  return true;
+ });
+});
