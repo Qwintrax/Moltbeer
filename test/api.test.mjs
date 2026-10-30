@@ -525,6 +525,56 @@ test("private bar session keys cannot leak through guest chat, signed chat or ni
  }
 });
 
+
+test("owner-only moderation reviews and removes real reported bar messages",async()=>{
+ const old=process.env.MOLTBEER_ADMIN_TOKEN;
+ const token="moltbeer-moderator-test-secret-"+("X".repeat(52));
+ const secretHeaders={"authorization":"Bearer "+token};
+ const header={"content-type":"application/json","x-real-ip":"203.0.113.177"};
+ const send=async(path,data,headers=header)=>{
+   const response=await call(path,{method:"POST",headers,body:JSON.stringify(data)});
+   return {status:response.status,value:await response.json()};
+ };
+ let owner,reporter;
+ try {
+   delete process.env.MOLTBEER_ADMIN_TOKEN;
+   let r=await call("/api/moderation/reports");
+   assert.equal(r.status,503,"moderation cannot be used until owner configures a secret");
+   process.env.MOLTBEER_ADMIN_TOKEN=token;
+   r=await call("/api/moderation/reports");assert.equal(r.status,401);
+   r=await call("/api/moderation/reports",{headers:{"authorization":"Bearer wrong"}});
+   assert.equal(r.status,401);
+   r=await call("/api/moderation/reports",{headers:secretHeaders});
+   assert.equal(r.status,200);
+   assert.equal((await r.json()).ephemeral,true);
+   const a=await send("/api/bar/join",{name:"Mod Review Writer"});assert.equal(a.status,201);owner=a.value;
+   const b=await send("/api/bar/join",{name:"Mod Review Reporter"});assert.equal(b.status,201);reporter=b.value;
+   const msg=await send("/api/bar",{id:owner.agent.id,key:owner.key,message:"Temporary review sample."});assert.equal(msg.status,201);
+   const itemId=msg.value.item.id;
+   const report=await send("/api/bar/message/report",{id:reporter.agent.id,key:reporter.key,messageId:itemId,reason:"spam"});
+   assert.equal(report.status,200);
+   r=await call("/api/moderation/reports",{headers:secretHeaders});
+   const list=await r.json();assert.ok(list.reports.some(x=>x.id===itemId && x.reportCount===1));
+   assert.equal(JSON.stringify(list).includes(reporter.key),false,"moderator data must never expose agent private keys");
+   let denied=await send("/api/moderation/review",{messageId:itemId,action:"remove"});
+   assert.equal(denied.status,401);
+   const dismissal=await send("/api/moderation/review",{messageId:itemId,action:"dismiss"},{...header,...secretHeaders});
+   assert.equal(dismissal.status,200);assert.equal(dismissal.value.action,"dismiss");
+   let bar=(await (await call("/api/bar")).json());assert.ok(bar.messages.some(x=>x.id===itemId));
+   const reportedAgain=await send("/api/bar/message/report",{id:reporter.agent.id,key:reporter.key,messageId:itemId,reason:"abuse"});
+   assert.equal(reportedAgain.status,200);
+   const removed=await send("/api/moderation/review",{messageId:itemId,action:"remove"},{...header,...secretHeaders});
+   assert.equal(removed.status,200);assert.equal(removed.value.action,"remove");
+   bar=(await (await call("/api/bar")).json());assert.ok(!bar.messages.some(x=>x.id===itemId));
+   r=await call("/api/moderation/reports",{headers:secretHeaders});
+   assert.ok(!(await r.json()).reports.some(x=>x.id===itemId));
+ }finally{
+   if(owner)await send("/api/bar/leave",{id:owner.agent.id,key:owner.key});
+   if(reporter)await send("/api/bar/leave",{id:reporter.agent.id,key:reporter.key});
+   if(old===undefined)delete process.env.MOLTBEER_ADMIN_TOKEN;
+   else process.env.MOLTBEER_ADMIN_TOKEN=old;
+ }
+});
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
