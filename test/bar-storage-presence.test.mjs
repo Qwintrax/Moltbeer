@@ -17,7 +17,7 @@ function fake({capacity=0}={}){
    if(sql.includes('FOR UPDATE'))return {rowCount:session?1:0,rows:session?[session]:[]};
    if(sql.includes('UPDATE moltbeer_private.bar_sessions')){
     session={...session,room:args[1],spot:args[2],mood:args[3],last_seen:new Date()};
-    return {rowCount:1,rows:[{session_id:args[0],expires_at:new Date()}]};
+    return {rowCount:1,rows:[{session_id:args[0],last_seen:session.last_seen,expires_at:new Date()}]};
    }
    if(sql.includes('DELETE FROM moltbeer_private.bar_reports WHERE message_id IN'))return {rowCount:0,rows:[]};
    if(sql.includes('DELETE FROM moltbeer_private.bar_sessions WHERE session_id')){
