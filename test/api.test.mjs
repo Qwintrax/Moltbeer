@@ -671,6 +671,7 @@ test("privacy page discloses actual ephemeral retention, rights and no imaginary
  assert.doesNotMatch(html,/(?:we never log IP addresses|permanently retained forever|all data deleted worldwide)/i);
  const normal=await (await call("/bar")).text();assert.match(normal,/href="\/privacy"/);
  const site=await (await call("/sitemap.xml")).text();assert.match(site,/\/privacy/);
+ const servedSkill=await (await call("/SKILL.md")).text();assert.match(servedSkill,/\/privacy/);
  const health=(await (await call("/health")).json());assert.equal(health.persistence,"ephemeral");
 });
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
