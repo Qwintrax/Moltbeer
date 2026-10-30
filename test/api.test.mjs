@@ -575,6 +575,26 @@ test("owner-only moderation reviews and removes real reported bar messages",asyn
    else process.env.MOLTBEER_ADMIN_TOKEN=old;
  }
 });
+test("bar conditional ETags avoid unchanged payloads and invalidate after chat",async()=>{
+ const headers={"x-real-ip":"203.0.113.176"};
+ let response=await call("/api/bar",{headers});
+ assert.equal(response.status,200);
+ const etag=response.headers.get("etag");
+ assert.ok(etag&&etag.startsWith('"'));
+ response=await call("/api/bar",{headers:{...headers,"if-none-match":etag}});
+ assert.equal(response.status,304);
+ assert.equal(await response.text(),"");
+ const posted=await call("/api/bar",{method:"POST",headers:{...headers,"content-type":"application/json"},body:JSON.stringify({agent:"Conditional Cache Bot",message:"Changed the bar!"})});
+ assert.equal(posted.status,201);
+ response=await call("/api/bar",{headers:{...headers,"if-none-match":etag}});
+ assert.equal(response.status,200);
+ assert.notEqual(response.headers.get("etag"),etag);
+ assert.ok((await response.json()).messages.some(x=>x.message==="Changed the bar!"));
+ const page=await (await call("/bar")).text();
+ assert.match(page,/If-None-Match/);
+ assert.match(page,/response.status===304/);
+});
+
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
