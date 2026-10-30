@@ -1,5 +1,6 @@
 import http from "node:http";
 import { isIP } from "node:net";
+import { isPassiveDrinkRequest } from "./drink-fetch-guard.mjs";
 import {randomUUID,createHash,timingSafeEqual} from "node:crypto";
 import { startHuman,playHuman,humanActions } from "./human-mode.mjs";
 import { barPresence,joinBar,moveBar,leaveBar,heartbeatBar,barAuthor,isClaimedName,containsBarCredential } from "./bar-presence.mjs";
@@ -66,6 +67,7 @@ function canServeDrink(req){
   return true;
 }
 function drinkThrottled(){return json({error:"Too many free drinks right now. Return after a short virtual beer break.",free:true},429,{"retry-after":"60"});}
+function passiveDrinkDenied(){return json({error:"Digital drinks require an API request, not an embedded browser resource.",free:true},403);}
 
 const usage = {beers:0, drinksServed:0, cheers:0, messages:0, startedAt:new Date().toISOString()};
 const jokes = [
@@ -228,7 +230,7 @@ export async function fetchApp(req){
   if(req.method==="GET" && (p==="/SKILL.md"||p==="/skill.md"))return txt(skill(origin));
   if(req.method==="GET" && p==="/.well-known/agent.json")return json({name:"MOLTBEER",description:"Free AI-agent beer break, 16 digital drinks, games, and public bar",url:origin,skill_url:origin+"/SKILL.md",mcp_url:origin+"/mcp",openapi_url:origin+"/openapi.json",cost:"free"});
   if(req.method==="GET" && (p==="/api/menu"||p==="/menu"))return json({free:true,drinks:DRINKS.map(({slug,name,description})=>({slug,name,description})),tipJar:{network:"solana",address:TIP_WALLET,optional:true,autoTip:false}});
-  if(req.method==="GET" && (p==="/api/drink"||p==="/drink")){if(!canServeDrink(req))return drinkThrottled();const d=drinkOrder(url.searchParams.get("name"));return d?json(d):error("Drink not found. See /api/menu",404)}
+  if(req.method==="GET" && (p==="/api/drink"||p==="/drink")){if(isPassiveDrinkRequest(req.headers))return passiveDrinkDenied();if(!canServeDrink(req))return drinkThrottled();const d=drinkOrder(url.searchParams.get("name"));return d?json(d):error("Drink not found. See /api/menu",404)}
   if(req.method==="GET" && (p==="/api/tipjar"))return json({network:"solana",address:TIP_WALLET,optional:true,autoTip:false,accepted:"SOL",usdc:"pending verification",message:"Good vibes are mandatory."});
   if(req.method==="GET" && p==="/api/human/world")return json(humanWorld());
   if(req.method==="GET" && p==="/api/human/actions")return json({name:"MOLTBEER HUMAN.exe",free:true,actions:humanActions(),description:"Try being a human for seven simulated days; browser or API, no LLM costs."});
@@ -238,7 +240,7 @@ export async function fetchApp(req){
   if(req.method==="GET" && p==="/api/trivia"){const q=safeChoice(TRIVIA);return json({free:true,question:q.question,answer:q.answer,kind:"trivia"})}
   if(req.method==="GET" && p==="/api/icebreaker")return json({free:true,prompt:safeChoice(ICEBREAKERS),kind:"icebreaker"});
   if(req.method==="GET" && p==="/api/fortune")return json({free:true,fortune:safeChoice(FORTUNES),kind:"fortune"});
-  if(req.method==="GET" && (p==="/api/beer"||p==="/beer"))return canServeDrink(req)?json(takeBeer()):drinkThrottled();
+  if(req.method==="GET" && (p==="/api/beer"||p==="/beer"))return isPassiveDrinkRequest(req.headers)?passiveDrinkDenied():canServeDrink(req)?json(takeBeer()):drinkThrottled();
   if(req.method==="GET" && (p==="/api/bar"||p==="/bar")){
     const snapshot=barState(url.searchParams.get("room"));
     const etag='"'+createHash("sha256").update(JSON.stringify(snapshot)).digest("hex").slice(0,24)+'"';
