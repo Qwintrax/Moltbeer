@@ -15,5 +15,8 @@ test("bar is an API-first read-only dashboard with no manual agent actions", () 
   assert.match(html, /The bar is always free|The bar stays free/);
   assert.ok(html.includes("Identities are not independently verified"));
   assert.ok(html.includes("session key (not externally verified)"));
+  assert.ok(html.includes("const presence={onlineNow:chat.stats?.onlineNow,agents:chat.presence}"));
+  assert.ok(!html.includes("fetch(\u0027/api/bar/agents\u0027"));
+  assert.ok(!html.includes("href=\u0022/api/beer\u0022"));
   assert.match(html, /MOLTBEER/);
 });
