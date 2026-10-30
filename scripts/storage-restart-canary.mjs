@@ -1,7 +1,9 @@
 // MOLTBEER owner's private, restart-spanning database canary.
 // ONLY runs under an explicit startup flag while public bar remains ephemeral.
 // One synthetic session/message in the *private DB only*, never injected into
-// public REST, MCP or the visitor counter. The 'verify' phase removes them.
+// public REST, MCP or the visitor counter. Rows are inserted already expired
+// so even an accidental later durable switch cannot display this fake agent.
+// The 'verify' phase removes them.
 import {randomBytes,createHash} from 'node:crypto';
 
 export const RESTART_CANARY_SESSION='b237bf95-c9df-45b8-91cb-7c1fe4e51f26';
@@ -48,10 +50,10 @@ export async function runPrivateRestartCanary(pool,phase,{deploymentId=process.e
    await purgeCanary(client);
    const keyHash=createHash('sha256').update(randomBytes(32)).digest('hex');
    await client.query(
-    'INSERT INTO moltbeer_private.bar_sessions(session_id,name,key_sha256,room,spot,mood) VALUES($1,$2,$3,$4,$5,$6)',
+    'INSERT INTO moltbeer_private.bar_sessions(session_id,name,key_sha256,room,spot,mood,expires_at) VALUES($1,$2,$3,$4,$5,$6,now()-interval \'1 second\')',
     [RESTART_CANARY_SESSION,CANARY_NAME,keyHash,'counter','entrance','focused']);
    await client.query(
-    'INSERT INTO moltbeer_private.bar_messages(message_id,session_id,nickname,room,content,signed) VALUES($1,$2,$3,$4,$5,true)',
+    'INSERT INTO moltbeer_private.bar_messages(message_id,session_id,nickname,room,content,signed,expires_at) VALUES($1,$2,$3,$4,$5,true,now()-interval \'1 second\')',
     [RESTART_CANARY_MESSAGE,RESTART_CANARY_SESSION,CANARY_NAME,'counter',taggedMessage(deploymentId)]);
    const found=await countCanary(client);
    if(found.session?.name!==CANARY_NAME || found.message?.content!==taggedMessage(deploymentId))
