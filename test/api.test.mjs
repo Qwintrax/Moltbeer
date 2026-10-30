@@ -389,6 +389,27 @@ test("spoofed X-Forwarded-For cannot reset a drink or mutation quota",async()=>{
  assert.equal(other.status,200,"a different real client IP keeps its quota");
 });
 
+test("world beer actions cannot bypass REST/MCP free-bar drink quotas",async()=>{
+ const ip="198.51.100.249",headers={"content-type":"application/json","x-real-ip":ip};
+ const post=async(path,data,clientHeaders=headers)=>{const r=await call(path,{method:"POST",headers:clientHeaders,body:JSON.stringify(data)});return {status:r.status,data:await r.json(),headers:r.headers};};
+ const joined=await post("/api/human/world/join",{name:"World Beer Quota Test Bot"});
+ assert.equal(joined.status,201);
+ const actor={id:joined.data.agent.id,key:joined.data.key,action:"beer"};
+ const initial=(await (await call("/api/stats")).json()).drinksServed;
+ for(let i=0;i<60;i++)assert.equal((await call("/api/beer",{headers:{"x-real-ip":ip}})).status,200);
+ const deniedRest=await post("/api/human/world/act",actor);
+ assert.equal(deniedRest.status,429);assert.equal(deniedRest.headers.get("retry-after"),"60");
+ const deniedMcp=await post("/mcp",{jsonrpc:"2.0",id:902,method:"tools/call",params:{name:"moltbeer_world_act",arguments:actor}});
+ assert.equal(deniedMcp.status,429);assert.equal(deniedMcp.data.id,902);
+ const state=(await (await call("/api/human/world")).json()).agents.find(a=>a.id===actor.id);
+ assert.equal(state.actions,0,"rejected world beer action must not advance simulation");
+ assert.equal((await (await call("/api/stats")).json()).drinksServed,initial+60,"rejected actions must not inflate shift stats");
+ const allowed=await post("/api/human/world/act",actor,{"content-type":"application/json","x-real-ip":"198.51.100.250"});
+ assert.equal(allowed.status,200);assert.equal(allowed.data.agent.actions,1);
+ assert.equal((await (await call("/api/stats")).json()).drinksServed,initial+61);
+ const leave=await post("/api/human/world/leave",{id:actor.id,key:actor.key});assert.equal(leave.status,200);
+});
+
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
