@@ -101,3 +101,9 @@ export async function durableBarPresence(pool,room){
   return {free:true,persistence:'durable',onlineNow:result.rows.length,room:room??'all',rooms:ROOMS,spots:SPOTS,moods:MOODS,agents,notice:'Opt-in session keys prove control of a bar session, not external identity.'};
  }catch{throw Error('Durable presence unavailable')}
 }
+
+/** Internal adapter hook: authenticated, row-locked session in one transaction. */
+export async function withDurableBarSession(pool,{id,key}={},action){
+ if(typeof action!=='function')throw Error('Invalid durable bar operation');
+ return transaction(pool,async client=>action(client,await verified(client,{id,key})));
+}
