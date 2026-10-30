@@ -15,7 +15,8 @@ export async function purgeExpiredBarRows(pool) {
       ['sessions',storageQueries.expireSessions],
       ['messages',storageQueries.expireMessages],
       ['reports',storageQueries.expireReports],
-      ['audit',storageQueries.expireAudit]
+      ['audit',storageQueries.expireAudit],
+      ['drinkEvents',storageQueries.expireDrinkEvents]
     ]) {
       const result=await client.query(sql);
       if (!Number.isSafeInteger(result.rowCount) || result.rowCount<0)
