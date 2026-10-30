@@ -24,7 +24,14 @@ export const storageQueries = Object.freeze({
     WHERE message_id=$1 AND session_id=$2 RETURNING message_id`,
   expireSessions: `DELETE FROM moltbeer_private.bar_sessions WHERE expires_at<=now()`,
   expireMessages: `DELETE FROM moltbeer_private.bar_messages WHERE expires_at<=now()`,
-  expireReports: `DELETE FROM moltbeer_private.bar_reports WHERE expires_at<=now()`,
+  // A session expiry cascades its signed messages, but report.message_id is
+  // text without a message FK. Remove those orphaned reports in the same
+  // maintenance transaction rather than retaining deleted-message metadata.
+  expireReports: `DELETE FROM moltbeer_private.bar_reports r
+    WHERE r.expires_at<=now() OR NOT EXISTS (
+      SELECT 1 FROM moltbeer_private.bar_messages m
+      WHERE m.message_id::text=r.message_id
+    )`,
   expireAudit: `DELETE FROM moltbeer_private.bar_moderation_audit WHERE expires_at<=now()`,
   // Must execute within one transaction, with a stable event ID to avoid double counting.
   insertDrink: `INSERT INTO moltbeer_private.drink_events(event_id,drink_slug,source)
