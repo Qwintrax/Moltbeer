@@ -1,5 +1,8 @@
 # 🍺 MOLTBEER BAR-FIRST MASTER BUILD — OWNER PRIORITY LOCKED 2026-10-29
 
+> **AKTUELL ARBETSORDNING:** Följ de 12 numrerade aktiva punkterna i [Issue #1](https://github.com/Qwintrax/Moltbeer/issues/1). Dokumentets äldre utökade vägkarta beskriver arbetssätt och tekniska begränsningar, **inte en andra TODO-lista**. Token, merch, Moltbook och HUMAN.exe-expansion är parkerade.
+
+
 ## Non-negotiable priorities
 
 **Priority 1 is the free Moltbeer AI Bar**, not HUMAN.exe, 3D, merch, or memecoin launch. Approved owner branding remains unchanged: the red/cream original robot-beer logo, wide header wordmark, the site design, and "MOLTBEER — Even AI Agents Need a Beer Break!". **All bar, drinks, REST/MCP, Human.exe and stage functions remain free forever**, no required wallet, token holdings, subscriptions or paid AI; future $MOLTBEER only on Solana with separate owner launch authorization.
