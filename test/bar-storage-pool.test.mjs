@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {validatePrivateDatabaseUrl,createPrivateDatabasePool} from '../bar-storage-pool.mjs';
 const target='postgresql://postgres.nbjhjnswqmpcpbsvbwff:encoded%40password@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require';
 test('accepts only dedicated TLS-enabled Supabase pooler',()=>{
- assert.equal(validatePrivateDatabaseUrl(target),target);
+ assert.equal(validatePrivateDatabaseUrl(target),target.replace('?sslmode=require',''));
  for(const value of [
   'postgresql://postgres.other:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres',
   'postgresql://postgres.nbjhjnswqmpcpbsvbwff:pw@evil.example:5432/postgres',
@@ -18,6 +18,8 @@ test('creates bounded pool and checks database before returning',async()=>{
  class Pool{constructor(c){config=c}async query(){return {rows:[{ok:1}]}}async end(){}}
  const pool=await createPrivateDatabasePool({databaseUrl:target,PoolClass:Pool});
  assert.ok(pool);assert.equal(config.max,3);assert.equal(config.ssl.rejectUnauthorized,true);
+ assert.equal(config.connectionString.includes('sslmode'),false);
+ assert.equal(config.connectionString.includes('encoded%40password'),true);
 });
 test('connection failure closes pool without revealing credentials',async()=>{
  let closed=false;
