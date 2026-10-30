@@ -1,21 +1,24 @@
-# MOLTBEER — Supabase persistence rollout (30 October 2026)
+# MOLTBEER — Supabase persistence rollout and active TODO
 
-## Verified provisioned resource
-- Dedicated Supabase project `nbjhjnswqmpcpbsvbwff`, `eu-west-1`, ACTIVE_HEALTHY at creation.
-- Organization cost quote for project creation: **0 per month**. This is NOT a guarantee of unlimited free usage or a verified spending hard stop.
-- Applied database migration `moltbeer_private_initial_storage`. The private schema contains `drink_events` (event UUID, timestamp, slug, source) and `bar_reports` (report UUID, message ID, reason, timestamps and 24h expiry). Both tables have RLS enabled; schema and tables revoke access to `anon` and `authenticated`.
-- Verified via Supabase table listing and read-only SQL: both tables exist, RLS enabled, 0 rows each.
+## Verified
+- [x] Separate Supabase MOLTBEER project `nbjhjnswqmpcpbsvbwff`, EU-west-1; creation quote 0/month.
+- [x] Private RLS-enabled tables `moltbeer_private.drink_events` and `moltbeer_private.bar_reports`; both verified empty at creation.
+- [x] Security advisor reviewed: two informational RLS-without-policy notices expected for private server-only tables.
+- [x] Railway variables inspected: no Supabase configuration names yet; no production integration is claimed.
+- [x] Existing Railway production deployment and bar-first workflow inspected.
 
-## Not connected yet
-The Railway bar still uses in-memory counters, chat, reports and consent-based presence. **Do not claim persistent totals**. No production secrets have been provisioned or exposed; do not add database service keys to GitHub or the browser. Do not silently switch routes or add new billable resources.
+## P0 — Next work, in order
+- [ ] Confirm free-tier limits and a practical hard-stop/no-surprise-spend policy; 0/month quote does not mean unlimited resources.
+- [ ] Choose server-only connectivity for private schema. Keep credentials exclusively in Railway environment variables; do not commit or log keys.
+- [ ] Implement opt-in durable drink events with unique event IDs, bounded requests and timeouts; never count failed writes as permanent.
+- [ ] Verify transactional lifetime count and display it separately from the current in-memory shift total.
+- [ ] Ensure reports expire in reality, not only by an `expires_at` field. Implement bounded cleanup and moderator access.
+- [ ] Define deletion and retention for agent profiles, chat and abuse reports before making those records durable.
+- [ ] Test REST and MCP parity, retries, duplicate events, DB outages, Railway restart durability, rate limits and privacy.
+- [ ] Verify CI, Railway health and real external-agent smoke tests before marking production persistence complete.
 
-## Safe next implementation plan
-1. Verify provider's free-tier pause behavior, storage/egress quotas and **actual hard cost controls** before production writes. A free project quote is not a verified cost cap.
-2. Use only server-side Railway environment variables for restricted Supabase access; prefer the private schema with least privilege. Never put privileged keys in browser, logs or GitHub.
-3. Add an opt-in server-side persistence adapter with strict timeouts, bounded write concurrency and a fail-closed response for durable-count operations. A failed database write must not be reported as a durable pour. Preserve existing shift counter semantics until atomic durability is proven.
-4. Add a transaction-safe, idempotent event ID per accepted drink, and an authoritative lifetime count from committed records only. Keep rate limits in place before writes; do not inflate numbers with synthetic tests.
-5. Reports: keep bounded retention and allow verified owner review; deleting a bar identity must remove associated personal content as designed. Database expiration requires an explicit purge mechanism (an `expires_at` column does **not** delete rows by itself). Avoid paid cron and always-on polling.
-6. Run local regression tests, controlled end-to-end REST/MCP tests, and Railway deployment/health checks. Test restart durability and deletion before enabling public lifetime stats.
-
-## Rollback
-If persistence fails, disable the adapter and preserve the existing free bar routes. Do not mislabel ephemeral shift totals as all-time totals. Do not migrate live chat or agent keys until privacy, deletion, and operational costs are verified.
+## Constraints
+- BAR first; HUMAN.exe and 3D later. Keep approved English branding and original bar design.
+- All digital drinks, visits, REST and MCP remain free. No token launch, paid plan or public key exposure.
+- Existing public bar is still ephemeral. Database provisioned != production connected.
+- If costs, safety or credentials are unverified, leave the existing bar running and report the blocker.
