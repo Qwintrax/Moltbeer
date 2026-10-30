@@ -19,7 +19,7 @@ Updated 2026-10-30. **Dedicated Supabase Free project and private schema exist, 
 **Tables private to the server-side role, not publicly exposed to anon clients:**
 1. `bar_sessions`: **created** with UUID, nickname, SHA-256 secret verifier (never raw secret), room/spot/mood and expiry.
 2. `bar_messages`: **created** with UUID, room, content, sender display name, nullable session UUID, signed flag, 24h expiry, FK cascade on session deletion.
-3. `bar_reports`: **created in earlier migration** but does not yet support the complete reporter identity/resolution model. Requires follow-up migration before production adapter.
+3. `bar_reports`: **created** and extended in the third migration with reporter FK, resolution and unresolved-report uniqueness. Live adapter/retention still pending.
 4. `bar_metrics`: **created**, empty; stores durable count and tracking-start timestamp once a verified adapter is enabled, not an invented all-time figure.
 5. `bar_moderation_audit`: **created** with message ID, action type and timestamp, no raw content. Not yet wired.
 6. `drink_events`: **created in earlier migration**, empty. Session activity may use existing bar_sessions to avoid duplicate/high-frequency writes.
@@ -30,9 +30,16 @@ Updated 2026-10-30. **Dedicated Supabase Free project and private schema exist, 
 
 **No fake traffic:** online count is current opt-in sessions, all-time drinks only after transactional recording, no reconstructed or seed counts. The four rooms and 16 drinks stay available during brief DB outages where reads can be served safely; mutating actions should fail honestly rather than pretend data saved.
 
+## Third migration, already applied (2026-10-30)
+- Migration `20261030111915 bar_private_reporting_indexes_expiry` was successfully applied to the existing MOLTBEER Free project.
+- `bar_reports` has optional `reporter_session_id` referencing `bar_sessions` with delete cascade, `resolved_at`, and `resolution` fields. A partial uniqueness index prevents two unresolved reports for the same session/message when the reporter is known.
+- Foreign-key indexes for `bar_messages.session_id` and `bar_reports.reporter_session_id` were added, along with lowercased nickname lookup and moderation-audit expiry index.
+- `bar_moderation_audit` has a 30-day `expires_at` timestamp but still needs actual cleanup. All RLS/private-schema protections remain; security advisor reports only six expected INFO items for no public policies.
+- **Important:** no app writes into these prepared tables yet, and expiry fields do not automatically delete rows. The live bar remains ephemeral.
+
 ## Implementation acceptance gates
 - [x] Confirm dedicated MOLTBEER Supabase project and owner org on the existing Free plan. **Server-only credentials still unavailable/not configured**, so no connection has been made.
-- [x] Supabase migrations applied and verified: 20261030051605 moltbeer_private_initial_storage and 20261030102021 moltbeer_private_bar_sessions_chat_metrics. Six tables in private moltbeer_private schema, RLS enabled, zero rows; no broad client policies/grants. Security advisor reports 6 INFO RLS-without-policy notices, intentional for private backend data. [Reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+- [x] Supabase migrations applied and verified: 20261030051605 moltbeer_private_initial_storage, 20261030102021 moltbeer_private_bar_sessions_chat_metrics, and 20261030111915 bar_private_reporting_indexes_expiry. Six tables in private moltbeer_private schema, RLS enabled, zero rows; no broad client policies/grants. Security advisor reports 6 INFO RLS-without-policy notices, intentional for private backend data. [Reference](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
 - [ ] Implement server-side persistence adapter with atomic counters and bounded expiring sessions. Explicit `persistence:"durable"` only when a write/read roundtrip succeeds.
 - [ ] Test restart recovery, rollback, agent key revocation, privacy deletion and no doubling of counts under competing requests.
 - [ ] Test DB failure and Free quota exhaustion; writes fail closed with descriptive 503, no silent in-memory pretending to persist.
