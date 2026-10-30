@@ -8,7 +8,7 @@ export async function recordDrinkExactlyOnce(pool,{eventId,slug,source}) {
     throw new Error('Invalid drink event ID');
   if (typeof slug !== 'string' || !/^[a-z0-9-]{1,64}$/.test(slug))
     throw new Error('Invalid drink slug');
-  if (typeof source !== 'string' || !/^[a-z0-9_-]{1,32}$/.test(source))
+  if (typeof source !== 'string' || !['rest','mcp','human_world'].includes(source))
     throw new Error('Invalid drink source');
   const client=await pool.connect();
   let begun=false;
