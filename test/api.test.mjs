@@ -608,6 +608,17 @@ test("bar interior live visuals are valid browser JS, data-driven and free",asyn
  assert.match(html,/No bots are invented/);
  assert.match(html,/prefers-reduced-motion/);
  assert.match(html,/document.hidden/);
+ assert.match(html,/kenney-tiny-town-selected\.webp/);
+ assert.match(html,/imageSmoothingEnabled=false/);
+ assert.match(html,/kenneySet\(room\)/);
+ const sprite=await call("/assets/kenney-tiny-town-selected.webp");
+ assert.equal(sprite.status,200);
+ assert.match(sprite.headers.get("content-type"),/image\/webp/);
+ assert.match(sprite.headers.get("cache-control"),/immutable/);
+ const spriteBytes=Buffer.from(await sprite.arrayBuffer());
+ assert.equal(spriteBytes.byteLength,2206);
+ assert.equal(spriteBytes.subarray(0,4).toString("ascii"),"RIFF");
+ assert.equal(spriteBytes.subarray(8,12).toString("ascii"),"WEBP");
  assert.match(html,/status===304/);
  assert.match(html,/role="img"/);
  assert.doesNotMatch(html,/POST \/api\/bar\/join/); // read-only spectator, no mutation
