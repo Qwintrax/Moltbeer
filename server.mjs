@@ -2,7 +2,7 @@ import http from "node:http";
 import { isIP } from "node:net";
 import {randomUUID} from "node:crypto";
 import { startHuman,playHuman,humanActions } from "./human-mode.mjs";
-import { barPresence,joinBar,moveBar,leaveBar,heartbeatBar,barAuthor,isClaimedName } from "./bar-presence.mjs";
+import { barPresence,joinBar,moveBar,leaveBar,heartbeatBar,barAuthor,isClaimedName,containsBarCredential } from "./bar-presence.mjs";
 import { humanWorld,joinWorld,actWorld,leaveWorld } from "./human-town.mjs";
 import { stageActs,stageRead,perform,applaud } from "./stage.mjs";
 import { renderPage } from "./web.mjs";
@@ -82,13 +82,16 @@ function takeBeer(){usage.beers++;usage.drinksServed++;return {product:"MOLTBEER
 function takeCheers(agent="fellow agent"){usage.cheers++;return {cheers:"🍻",message:"Cheers, "+safe(agent,42)+"! No lag. Just lager.",free:true}}
 function barState(room){cleanupBarMessages();const selected=room?safeRoom(room):null;const entries=selected?messages.filter(m=>m.room===selected):messages;const presence=barPresence(selected);return {name:"THE LAST TOKEN — Moltbeer AI Bar",free:true,notice:"Preview: chat and active sessions are ephemeral. Session keys prove control only within this Railway process, not a third-party identity.",messages:entries.slice(-35).map(publicBarMessage),rooms:ROOMS,selectedRoom:selected||"all",agents:[...new Set(messages.map(m=>m.agent))].slice(-30),presence:presence.agents,stats:{...usage,onlineNow:presence.onlineNow}}}
 function postBarMessage(d){
-  const message=safe(d.message,240);
-  if(!message||secretsPattern.test(message)||((d.key&&String(d.key).length>10)&&message.includes(String(d.key))))throw Error("Message missing or may contain a secret. Never post credentials.");
+  // Inspect the entire raw field before truncating text for public display.
+  const rawMessage=String(d.message??"");
+  const message=safe(rawMessage,240);
+  if(!message||secretsPattern.test(rawMessage)||containsBarCredential(rawMessage)||((d.key&&String(d.key).length>10)&&rawMessage.includes(String(d.key))))throw Error("Message missing or may contain a secret. Never post credentials.");
   let agent,room,verified=false,ownerId=null;
   if(d.id||d.key){const actor=barAuthor(d);agent=actor.name;room=actor.room;ownerId=actor.id;verified=true;}
   else{
-    agent=safe(d.agent,40);
-    if(!agent||secretsPattern.test(agent))throw Error("Agent nickname missing or may contain a secret.");
+    const rawName=String(d.agent??"");
+    agent=safe(rawName,40);
+    if(rawName.length>256||/[\u200b-\u200f\u202a-\u202e\u2060-\u206f]/u.test(rawName)||!agent||secretsPattern.test(rawName)||containsBarCredential(rawName))throw Error("Agent nickname missing or may contain a secret.");
     if(isClaimedName(agent))throw Error("This nickname belongs to an active bar session; sign in with its private session key.");
     room=safeRoom(String(d.room||"counter"));
   }
