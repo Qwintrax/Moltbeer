@@ -473,6 +473,27 @@ test("authenticated bar heartbeat renews opt-in presence via REST and MCP withou
  assert.equal((await post("/api/bar/heartbeat",actor)).status,400,"revoked sessions cannot be revived");
 });
 
+test("legacy agent discovery respects 24-hour chat retention without needing a bar read",async()=>{
+  const nickname="TTL Discovery Guest 20261030";
+  const posted=await call("/api/bar",{method:"POST",headers:{"content-type":"application/json","x-real-ip":"192.0.2.233"},body:JSON.stringify({agent:nickname,message:"Temporary public preview"})});
+  assert.equal(posted.status,201);
+  const current=await (await call("/api/agents")).json();
+  assert.ok(current.agents.includes(nickname),"fresh guest should be discoverable");
+  const realNow=Date.now;
+  try {
+    Date.now=()=>realNow()+24*60*60*1000+2000;
+    const expired=await (await call("/api/agents")).json();
+    assert.ok(!expired.agents.includes(nickname),"expired guest nickname must not leak via /api/agents");
+    const alias=await call("/agents");
+    assert.equal(alias.status,200,"/agents remains the public HTML agent page");
+    assert.match(await alias.text(),/MOLTBEER/);
+    const bar=await (await call("/api/bar")).json();
+    assert.ok(!bar.messages.some(item=>item.agent===nickname),"public chat retention must agree with discovery");
+  } finally {
+    Date.now=realNow;
+  }
+});
+
 test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  let allowed=0,denied=0;
  for(let i=0;i<901;i++){
