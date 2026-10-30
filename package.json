@@ -8,7 +8,8 @@
     "start": "node server.mjs",
     "test": "node --check scripts/smoke-readonly.mjs && node --test",
     "dev": "node --watch server.mjs",
-    "storage:probe": "node scripts/storage-probe.mjs"
+    "storage:probe": "node scripts/storage-probe.mjs",
+    "storage:acceptance": "node scripts/storage-acceptance.mjs"
   },
   "engines": {
     "node": ">=22"
