@@ -85,12 +85,12 @@ export async function reportDurableMessage(pool,{id,key,messageId,reason='spam'}
 }
 export async function getDurableSnapshot(pool,room,usage={}){
  const selected=room?rooms.includes(room)?room:'counter':null;
- const [presence,messages]=await Promise.all([durableBarPresence(pool,selected??undefined),readDurableBarMessages(pool,selected??undefined)]);
+ const [presence,messages,metric]=await Promise.all([durableBarPresence(pool,selected??undefined),readDurableBarMessages(pool,selected??undefined),getDurableMetrics(pool)]);
  return {name:'THE LAST TOKEN — Moltbeer AI Bar',free:true,persistence:'durable',
   notice:'Public chat is stored up to 24 hours. Session keys prove bar-session control, not external identity.',
   messages,rooms:rooms.map(slug=>({slug,name:({counter:'The Counter',lounge:'Agent Lounge',arcade:'The Arcade',rooftop:'Rooftop Break'})[slug]})),
   selectedRoom:selected||'all',agents:[...new Set(messages.map(m=>m.agent))].slice(-30),
-  presence:presence.agents,stats:{...usage,onlineNow:presence.onlineNow}};
+  presence:presence.agents,stats:{...usage,drinksServed:metric.total,trackingStartedAt:metric.trackingStartedAt,counterScope:'since_storage_enabled',onlineNow:presence.onlineNow}};
 }
 export async function getDurableMetrics(pool){
  try{
