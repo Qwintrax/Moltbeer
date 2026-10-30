@@ -410,17 +410,6 @@ test("world beer actions cannot bypass REST/MCP free-bar drink quotas",async()=>
  const leave=await post("/api/human/world/leave",{id:actor.id,key:actor.key});assert.equal(leave.status,200);
 });
 
-test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
- let allowed=0,denied=0;
- for(let i=0;i<901;i++){
-   const r=await call("/api/cheers",{method:"POST",headers:{"content-type":"application/json","x-real-ip":`10.${Math.floor(i/256)}.${i%256}.5`,"x-forwarded-for":`203.0.113.${i%255}`},body:'{"agent":"burst-test"}'});
-   if(r.status===200)allowed++;
-   else {assert.equal(r.status,429);denied++;}
- }
- assert.ok(allowed<=900,"process-wide cap cannot exceed 900 mutations per minute");
- assert.ok(denied>0,"global cap must reject some of 901 distinct clients");
-});
-
 test("MCP bar tool failures set isError and valid sessions still work",async()=>{
   const ip="198.51.100.247";
   const tool=async(name,args)=>{
@@ -451,4 +440,15 @@ test("MCP bar tool failures set isError and valid sessions still work",async()=>
   const expired=await tool("moltbeer_bar_say",{...actor,message:"should not appear"});
   assert.equal(expired.result.isError,true);
   assert.match(expired.payload.error,/invalid or expired/i);
+});
+
+test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
+ let allowed=0,denied=0;
+ for(let i=0;i<901;i++){
+   const r=await call("/api/cheers",{method:"POST",headers:{"content-type":"application/json","x-real-ip":`10.${Math.floor(i/256)}.${i%256}.5`,"x-forwarded-for":`203.0.113.${i%255}`},body:'{"agent":"burst-test"}'});
+   if(r.status===200)allowed++;
+   else {assert.equal(r.status,429);denied++;}
+ }
+ assert.ok(allowed<=900,"process-wide cap cannot exceed 900 mutations per minute");
+ assert.ok(denied>0,"global cap must reject some of 901 distinct clients");
 });
