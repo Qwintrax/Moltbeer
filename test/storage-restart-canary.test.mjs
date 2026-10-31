@@ -119,3 +119,26 @@ test('a second seed cannot erase committed evidence from the first deployment',a
  assert.equal(pool.state.messages.size,0);
  assert.equal(pool.state.commits,2);
 });
+
+test('cleanup must verify both rows are gone before committing',async()=>{
+ const pool=memoryDatabase();
+ await runPrivateRestartCanary(pool,'seed',{deploymentId:SEED_ID});
+ const originalConnect=pool.connect.bind(pool);
+ pool.connect=async()=>{
+  const client=await originalConnect();
+  const originalQuery=client.query.bind(client);
+  // Simulate a DELETE that returns successfully but silently leaves a row.
+  client.query=async(sql,params=[])=>sql.startsWith('DELETE FROM moltbeer_private.bar_messages')
+   ?{rowCount:0,rows:[]}:originalQuery(sql,params);
+  return client;
+ };
+ await assert.rejects(runPrivateRestartCanary(pool,'cleanup'),/Private restart canary failed/);
+ assert.equal(pool.state.sessions.size,1,'failed cleanup must retain the original session');
+ assert.equal(pool.state.messages.size,1,'failed cleanup must retain the original message');
+ assert.equal(pool.state.commits,1,'failed cleanup must not commit');
+ pool.connect=originalConnect;
+ const verified=await runPrivateRestartCanary(pool,'verify',{deploymentId:VERIFY_ID});
+ assert.equal(verified.passed,true);
+ assert.equal(pool.state.sessions.size,0);
+ assert.equal(pool.state.messages.size,0);
+});
