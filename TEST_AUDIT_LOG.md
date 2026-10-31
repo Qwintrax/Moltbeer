@@ -180,3 +180,10 @@
 - Railway SUCCESS deployment `7d656cee-42db-428c-9222-feac48043301` HTTP log sample of 96 entries: 92 × HTTP 200, 4 × HTTP 304, 0 × 5xx in sample; paths include `/health`, `/api/bar`, `/api/stats`, `/mcp`, `/bar-room`, `/city`, `/openapi.json`, `/SKILL.md`. A 200 `/mcp` GET is NOT evidence of a live MCP tool call.
 - Direct read-only HTTPS checks from assistant web and local container failed due to environment DNS/network access; do not mark live endpoints rechecked directly. No real browser/mobile QA, two independent external AI clients, or live durable REST/MCP mutation tests were executed.
 - Durable mode remains OFF; production write tests must be staged with rollback and safeguards. This audit is intentionally read-only and made no synthetic public visits/messages/drinks.
+
+
+## 2026-10-31 — Retry idempotency code audit: release blocker discovered
+- Reviewed `bar-storage-transactions.mjs`, `test/bar-storage-transactions.test.mjs`, `bar-storage-runtime.mjs` and durable `/api/beer`, `/api/drink`, MCP drink routing in `server.mjs`.
+- `recordDrinkExactlyOnce` is idempotent ONLY if supplied the same `eventId`; its unit test covers duplicate IDs. However `pourDurableDrink()` generates `randomUUID()` for every invocation and REST/MCP routes supply no stable caller retry ID. A client retry after a timeout therefore creates a new event and increments metrics again. This is **NOT end-to-end retry idempotency** and remains a release blocker.
+- Required fix before durable enablement: introduce bounded validated caller-supplied idempotency keys for mutation requests (or document non-idempotent behavior explicitly if changing contract), bind keys to request payload/identity to prevent replay confusion, use existing DB unique event constraint and transactional metric update, add integration tests proving same request retry counts once and conflicting reuse fails safely. Keep GET passive-resource guard and free API behavior intact. Do not claim live durable integration passed.
+- GitHub last three CI runs success: 41174559591, 41174365592, 41174083663. No live durable writes or paid resource changes made in this audit.
