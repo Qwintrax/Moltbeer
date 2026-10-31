@@ -3,7 +3,7 @@
 // against the *existing* project/environment; verify no new paid resources,
 // changed replicas, domains, auto-sleep settings, or replaced service IDs.
 // This file alone does NOT activate IaC or remove existing railway.json.
-import { defineRailway, project, service } from "railway/iac";
+import { defineRailway, project, service, preserve } from "railway/iac";
 
 // Official per-repository migration recommends a named partial for a single service.
 // This is still a candidate only; validate ownership with railway config migrate/plan.
@@ -18,6 +18,18 @@ export default defineRailway(() => {
     start: "npm start",
     healthcheck: "/health",
     healthcheckTimeout: 60,
+    // Existing live Railway variable NAMES only; never put values in source.
+    // preserve() is Railway's official way to keep existing managed secrets.
+    // Recheck this inventory against the live service before any migration.
+    env: {
+      DATABASE_URL: preserve(),
+      MOLTBEER_ADMIN_TOKEN: preserve(),
+      MOLTBEER_RESTART_CANARY_PHASE: preserve(),
+      MOLTBEER_STORAGE_ACCEPTANCE: preserve(),
+      MOLTBEER_STORAGE_MODE: preserve(),
+      MOLTBEER_STORAGE_PREFLIGHT: preserve(),
+      MOLTBEER_X402_TIPS_ENABLED: preserve(),
+    },
   });
 
   return project("Moltbeer", {
