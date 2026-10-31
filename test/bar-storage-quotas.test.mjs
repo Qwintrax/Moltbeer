@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {assertDurableWriteCapacity} from '../bar-storage-quotas.mjs';
 
-function fake(n){
+function fake(n,{existing=false}={}){
  const calls=[];
  return {calls,client:{async query(sql,args=[]){
   calls.push({sql,args});
   if(sql.includes('pg_advisory_xact_lock'))return {rows:[{}],rowCount:1};
   if(sql.includes('count(*)::int AS n'))return {rows:[{n}],rowCount:1};
+  if(sql.includes('SELECT 1 FROM moltbeer_private.drink_events WHERE event_id=$1'))
+   return {rows:existing?[{one:1}]:[],rowCount:existing?1:0};
   throw Error('Unexpected SQL');
  }}};
 }
@@ -30,4 +32,17 @@ test('free-tier drink cap bounds event retention window',async()=>{
 test('invalid capacity data fails closed rather than allowing unbounded writes',async()=>{
  await assert.rejects(assertDurableWriteCapacity(fake(undefined).client,'chat'),/Invalid capacity sample/);
  await assert.rejects(assertDurableWriteCapacity(fake(-1).client,'drink'),/Invalid capacity sample/);
+});
+
+test('idempotent drink retries at capacity are accepted but new events remain blocked',async()=>{
+ const eventId='e50f33a2-64cb-4f8c-9359-f7f5d19f56ca';
+ const existing=fake(20000,{existing:true});
+ await assertDurableWriteCapacity(existing.client,'drink',eventId);
+ assert.equal(existing.calls[2].args[0],eventId);
+ const newEvent=fake(20000);
+ await assert.rejects(assertDurableWriteCapacity(newEvent.client,'drink',eventId),e=>e.code==='BAR_CAPACITY');
+ assert.equal(newEvent.calls.length,3);
+ const below=fake(19999);
+ await assertDurableWriteCapacity(below.client,'drink',eventId);
+ assert.equal(below.calls.length,2,'avoid extra lookup below the cap');
 });

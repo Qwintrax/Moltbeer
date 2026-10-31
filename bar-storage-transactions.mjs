@@ -17,7 +17,7 @@ export async function recordDrinkExactlyOnce(pool,{eventId,slug,source}) {
   let begun=false;
   try {
     await client.query('BEGIN'); begun=true;
-    await assertDurableWriteCapacity(client,'drink');
+    await assertDurableWriteCapacity(client,'drink',eventId);
     const inserted=await client.query(storageQueries.insertDrink,[eventId,slug,source]);
     let total=null;
     if (inserted.rowCount===1) {

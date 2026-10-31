@@ -4,12 +4,14 @@ import {randomUUID} from 'node:crypto';
 import {recordDrinkExactlyOnce} from '../bar-storage-transactions.mjs';
 import {durableDrinkEventId,pourDurableDrink,publicDurableError} from '../bar-storage-runtime.mjs';
 
-function fake({duplicate=false,failCounter=false}={}){
+function fake({duplicate=false,failCounter=false,atCapacity=false}={}){
  const calls=[];let released=false;
  const client={async query(sql,args){calls.push({sql,args});
   if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK')return {rowCount:0};
   if(sql.includes('pg_advisory_xact_lock'))return {rowCount:1,rows:[{}]};
-  if(sql.includes('count(*)::int AS n'))return {rowCount:1,rows:[{n:0}]};
+  if(sql.includes('count(*)::int AS n'))return {rowCount:1,rows:[{n:atCapacity?20000:0}]};
+  if(sql.includes('SELECT 1 FROM moltbeer_private.drink_events WHERE event_id=$1'))
+   return {rowCount:duplicate?1:0,rows:duplicate?[{one:1}]:[]};
   if(sql.includes('INSERT INTO moltbeer_private.drink_events'))return {rowCount:duplicate?0:1,rows:duplicate?[]:[{event_id:args[0]}]};
   if(sql.includes('INSERT INTO moltbeer_private.bar_metrics')){if(failCounter)throw Error('database unavailable');return {rowCount:1,rows:[{total:'1'}]};}
   throw Error('unexpected query');},release(){released=true}};
@@ -90,4 +92,17 @@ test('database connection failure rejects before any drink is produced or record
   return true;
  });
  assert.equal(produced,0);
+});
+
+test('a real idempotent retry does not fail or increment metrics when the 24h quota is full',async()=>{
+ const eventId=randomUUID();
+ const existing=fake({duplicate:true,atCapacity:true});
+ const result=await recordDrinkExactlyOnce(existing.pool,{eventId,slug:'moltbeer',source:'rest'});
+ assert.deepEqual(result,{recorded:false,total:null});
+ assert.ok(existing.calls.some(c=>c.sql==='COMMIT'));
+ assert.equal(existing.calls.some(c=>c.sql.includes('INSERT INTO moltbeer_private.bar_metrics')),false);
+ const newEvent=fake({atCapacity:true});
+ await assert.rejects(recordDrinkExactlyOnce(newEvent.pool,{eventId:randomUUID(),slug:'moltbeer',source:'rest'}),e=>e.code==='BAR_CAPACITY');
+ assert.equal(newEvent.calls.at(-1).sql,'ROLLBACK');
+ assert.equal(newEvent.released,true);
 });
