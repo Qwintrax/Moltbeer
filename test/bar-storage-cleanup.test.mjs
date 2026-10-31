@@ -55,3 +55,34 @@ test('cleanup executes all five bounded retention deletes in order',async()=>{
  assert.match(statements.find(s=>s.includes('drink_events')),/interval '24 hours'/);
  assert.equal(x.calls.at(-1),'COMMIT');
 });
+
+test('invalid cleanup row counts roll back and release the connection',async()=>{
+ for(const invalid of [-1,1.5,undefined,Number.NaN]){
+  const calls=[];let released=false;
+  const client={async query(sql){
+   calls.push(sql);
+   if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK')return {rowCount:0};
+   return {rowCount:invalid};
+  },release(){released=true}};
+  await assert.rejects(purgeExpiredBarRows({async connect(){return client}}),/cleanup transaction failed/);
+  assert.equal(calls.at(-1),'ROLLBACK');
+  assert.equal(calls.includes('COMMIT'),false);
+  assert.equal(released,true);
+ }
+});
+
+test('commit failure triggers rollback attempt without leaking driver details',async()=>{
+ const calls=[];let released=false;
+ const client={async query(sql){
+  calls.push(sql);
+  if(sql==='COMMIT')throw Error('private connection password');
+  return {rowCount:1};
+ },release(){released=true}};
+ await assert.rejects(purgeExpiredBarRows({async connect(){return client}}),err=>{
+  assert.equal(err.message,'Durable cleanup transaction failed');
+  assert.equal(err.message.includes('password'),false);
+  return true;
+ });
+ assert.equal(calls.at(-1),'ROLLBACK');
+ assert.equal(released,true);
+});
