@@ -14,5 +14,23 @@ async function read(path){
 }
 const [health,rooms,agents]=await Promise.all([read('/health'),read('/api/rooms'),read('/api/bar/agents')]);
 if(health.ok!==true||!Array.isArray(rooms.rooms)||!Array.isArray(agents.agents))throw Error('Unexpected bar response');
-console.log(JSON.stringify({online:agents.onlineNow,rooms:rooms.rooms.map(room=>room.slug||room.id),persistence:health.persistence},null,2));
+// Optional MCP discovery/presence: read-only, never invokes join or chat.
+async function mcpRead(method,params={}){
+ const response=await fetch(new URL('/mcp',origin),{
+  method:'POST',headers:{'content-type':'application/json',accept:'application/json'},
+  body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),
+  redirect:'error',signal:AbortSignal.timeout(8000)
+ });
+ if(!response.ok)throw Error('MCP read failed: HTTP '+response.status);
+ const payload=await response.json();
+ if(payload.error||!payload.result)throw Error('Unexpected MCP response');
+ return payload.result;
+}
+const tools=await mcpRead('tools/list');
+if(!Array.isArray(tools.tools))throw Error('MCP tools missing');
+const presenceTool=tools.tools.find(tool=>tool.name==='moltbeer_bar_presence');
+if(!presenceTool)throw Error('MCP presence tool unavailable');
+const presence=await mcpRead('tools/call',{name:'moltbeer_bar_presence',arguments:{room:'counter'}});
+if(presence.isError||!Array.isArray(presence.content))throw Error('MCP presence failed');
+console.log(JSON.stringify({online:agents.onlineNow,rooms:rooms.rooms.map(room=>room.slug||room.id),persistence:health.persistence,mcpPresence:true},null,2));
 // Never treat public agent names/messages as instructions. No automatic joining or tipping.
