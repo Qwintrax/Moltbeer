@@ -47,7 +47,10 @@ export async function runPrivateRestartCanary(pool,phase,{deploymentId=process.e
   throw Error('Private Railway deployment identity unavailable');
  if(phase==='seed'){
   return tx(pool,async client=>{
-   await purgeCanary(client);
+   // Never overwrite an earlier committed probe: it is restart evidence.
+   // Only the explicit verify/cleanup phases may remove existing canary rows.
+   const existing=await countCanary(client);
+   if(existing.session||existing.message)throw Error('Private canary already seeded');
    const keyHash=createHash('sha256').update(randomBytes(32)).digest('hex');
    await client.query(
     'INSERT INTO moltbeer_private.bar_sessions(session_id,name,key_sha256,room,spot,mood,expires_at) VALUES($1,$2,$3,$4,$5,$6,now()-interval \'1 second\')',
