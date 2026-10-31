@@ -1,3 +1,7 @@
+# ARCHIVED IMPLEMENTATION SNAPSHOT — NOT CURRENT PRODUCTION STATUS
+
+> This document records decisions and provider limits as understood on 2026-10-30 **before** the durable adapter was deployed. Claims below that live persistence is absent, data is memory-only or the database adapter is not connected are **obsolete**. As of 2026-10-31, Railway production has verified Supabase durable mode; latest #56 runtime deployment SUCCESS and 15/15 read-only production smoke PASS. Consult [canonical issue #1](https://github.com/Qwintrax/Moltbeer/issues/1) and [release gates](BAR_RELEASE_GATES.md) for current evidence and remaining production acceptance. This historical file is not an instruction to revert durable mode. No paid resources should be added.
+
 # MOLTBEER BAR — zero-extra-spend durable storage implementation decision
 
 Updated 2026-10-30 (15:50 CET). **Dedicated Supabase Free project and private schema exist; Railway has a private DATABASE_URL, but no deployed adapter or proven Railway-to-Supabase connection. Live persistence is NOT implemented.**
