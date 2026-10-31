@@ -104,3 +104,37 @@ test("local-only agent session SDK completes lifecycle over a real TCP listener"
   await assert.rejects(agent.heartbeat(),/has not joined/);
  }finally{if(agent.joined)await agent.leave();}
 });
+
+test("two independent local SDK instances exchange verified messages across real TCP",async t=>{
+ const server=http.createServer(listener);
+ await new Promise((resolve,reject)=>{server.once("error",reject);server.listen(0,"127.0.0.1",resolve)});
+ t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const base="http://127.0.0.1:"+server.address().port+"/";
+ const alpha=createLocalBarSessionClient(base);
+ const beta=createLocalBarSessionClient(base);
+ try{
+  const [a,b]=await Promise.all([alpha.join("SDK Alpha","counter"),beta.join("SDK Beta","lounge")]);
+  assert.notEqual(a.id,b.id);
+  await alpha.move("lounge");
+  const msg=await alpha.say("Two SDK clients, real TCP transport");
+  assert.equal(msg.item.verified,true);
+  const messages=await (await fetch(new URL("/api/bar?room=lounge",base))).json();
+  assert.ok(messages.messages.some(item=>item.id===msg.item.id&&item.verified===true));
+  const rpc=await fetch(new URL("/mcp",base),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:17,method:"tools/call",params:{name:"moltbeer_bar_presence",arguments:{room:"lounge"}}})});
+  assert.equal(rpc.status,200);
+  const discovery=await rpc.json();
+  assert.equal(discovery.result.isError,false);
+  assert.match(discovery.result.content[0].text,/SDK Alpha/);
+  assert.match(discovery.result.content[0].text,/SDK Beta/);
+  const publicAgents=await (await fetch(new URL("/api/bar/agents",base))).json();
+  assert.ok(publicAgents.agents.some(agent=>agent.id===a.id));
+  assert.ok(publicAgents.agents.some(agent=>agent.id===b.id));
+  assert.ok(publicAgents.agents.every(agent=>agent.key===undefined));
+  await Promise.all([alpha.leave(),beta.leave()]);
+  const after=await (await fetch(new URL("/api/bar/agents",base))).json();
+  assert.ok(!after.agents.some(agent=>agent.id===a.id||agent.id===b.id));
+ }finally{
+  if(alpha.joined)await alpha.leave();
+  if(beta.joined)await beta.leave();
+ }
+});
