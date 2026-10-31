@@ -14,7 +14,7 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
   if(!response.ok)throw Error('Local bar request failed: '+path+' HTTP '+response.status);
   return response.json();
  }
- function credentials(){if(!session)throw Error('Agent has not joined');return {id:session.agent.id,key:session.key};}
+ function credentials(){if(!session)throw Error('Agent has not joined');if(leaving)throw Error('Agent is leaving');return {id:session.agent.id,key:session.key};}
  return {
   get joined(){return Boolean(session);},
   async join(name,room='counter'){
@@ -35,7 +35,7 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
    if(leaving)throw Error('Agent already leaving');
    if(!session)return false;
    leaving=true;
-   try{await post('/api/bar/leave',credentials());session=null;return true;}
+   try{await post('/api/bar/leave',{id:session.agent.id,key:session.key});session=null;return true;}
    finally{leaving=false;} // preserve credentials on failure for explicit retry
   }
  };

@@ -111,3 +111,25 @@ test('leave during pending join is rejected instead of silently orphaning sessio
  assert.equal(await client.leave(),true);
  assert.equal(leaves,1);
 });
+
+test('pending leave blocks heartbeat, move and chat until completion',async()=>{
+ let resolveLeave,actions=0;
+ const pending=new Promise(resolve=>{resolveLeave=resolve;});
+ const fake=async(url)=>{
+  const path=new URL(url).pathname;
+  if(path==='/api/bar/join')return {ok:true,json:async()=>({agent:{id:'agent'},key:'secret'})};
+  if(path==='/api/bar/leave')await pending;
+  else actions++;
+  return {ok:true,json:async()=>({ok:true})};
+ };
+ const client=createLocalBarSessionClient('http://127.0.0.1:3000/',{fetchImpl:fake});
+ await client.join('Agent');
+ const leaving=client.leave();
+ await assert.rejects(client.heartbeat(),/leaving/);
+ await assert.rejects(client.move('lounge'),/leaving/);
+ await assert.rejects(client.say('hello'),/leaving/);
+ assert.equal(actions,0,'no heartbeat, move or chat may reach the network during leave');
+ resolveLeave();
+ assert.equal(await leaving,true);
+ assert.equal(client.joined,false);
+});
