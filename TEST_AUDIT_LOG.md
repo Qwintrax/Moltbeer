@@ -173,3 +173,10 @@
 - Reviewed `bar-storage-runtime.mjs`, `bar-storage-presence.mjs`, `bar-storage-chat.mjs`, `bar-storage-transactions.mjs`, `bar-storage-cleanup.mjs`, `bar-storage-quotas.mjs`, `bar-storage-pool.mjs`: explicit durable mode gating, PostgreSQL transaction rollback, per-session credential hash verification, capped chat/drink writes, expired-row cleanup, internal drink event unique insert before metric increment, and generic failure responses are present in code. Code review is NOT a live integration PASS.
 - Read-only Supabase catalog inspection was blocked by tool safety controls; no bypass attempted and no SQL change made. This security check remains NOT TESTED in this pass.
 - Remaining release gates: actual live durable REST/MCP read/write and DB-outage fail-closed, TTL/deletion, retry idempotency, independent external agent integrations, real mobile/browser QA, enforceable cost rollback. Durable remains OFF. Do not mark issue #1 complete.
+
+
+## 2026-10-31 — New read-only verification attempt, limits disclosed
+- GitHub latest five workflow runs were completed SUCCESS (`41174365592`, `41174083663`, `41173811118`, `41173660298`, `41173454231`). This is CI evidence, not live durable integration.
+- Railway SUCCESS deployment `7d656cee-42db-428c-9222-feac48043301` HTTP log sample of 96 entries: 92 × HTTP 200, 4 × HTTP 304, 0 × 5xx in sample; paths include `/health`, `/api/bar`, `/api/stats`, `/mcp`, `/bar-room`, `/city`, `/openapi.json`, `/SKILL.md`. A 200 `/mcp` GET is NOT evidence of a live MCP tool call.
+- Direct read-only HTTPS checks from assistant web and local container failed due to environment DNS/network access; do not mark live endpoints rechecked directly. No real browser/mobile QA, two independent external AI clients, or live durable REST/MCP mutation tests were executed.
+- Durable mode remains OFF; production write tests must be staged with rollback and safeguards. This audit is intentionally read-only and made no synthetic public visits/messages/drinks.
