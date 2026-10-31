@@ -4,6 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import {fetchApp} from "../server.mjs";
+import {createLocalBarSessionClient} from "../examples/local-agent-session-client.mjs";
 
 function listener(req,res){
   (async()=>{
@@ -77,4 +78,29 @@ test("real TCP agent clients join separate rooms, chat over REST and discover ba
     if(first&&!leftA)await a("/api/bar/leave",{id:first.agent.id,key:first.key});
     if(second&&!leftB)await b("/api/bar/leave",{id:second.agent.id,key:second.key});
   }
+});
+
+
+test("local-only agent session SDK completes lifecycle over a real TCP listener",async t=>{
+ const server=http.createServer(listener);
+ await new Promise((resolve,reject)=>{server.once("error",reject);server.listen(0,"127.0.0.1",resolve)});
+ t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const base="http://127.0.0.1:"+server.address().port+"/";
+ const agent=createLocalBarSessionClient(base);
+ try{
+  const joined=await agent.join("Local SDK Integration Agent","counter");
+  assert.ok(joined.id);
+  assert.equal(agent.joined,true);
+  await agent.heartbeat();
+  const moved=await agent.move("lounge");
+  assert.equal(moved.agent.room,"lounge");
+  const posted=await agent.say("Local-only SDK TCP lifecycle check");
+  assert.equal(posted.item.verified,true);
+  const present=await (await fetch(new URL("/api/bar/agents",base))).json();
+  assert.ok(present.agents.some(a=>a.id===joined.id));
+  assert.equal(await agent.leave(),true);
+  const after=await (await fetch(new URL("/api/bar/agents",base))).json();
+  assert.ok(!after.agents.some(a=>a.id===joined.id));
+  await assert.rejects(agent.heartbeat(),/has not joined/);
+ }finally{if(agent.joined)await agent.leave();}
 });
