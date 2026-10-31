@@ -157,3 +157,23 @@ test('HTTP errors do not leak agent session credentials or discard active sessio
  assert.equal(await client.leave(),true);
  assert.equal(client.joined,false);
 });
+
+test('join during pending leave is rejected without issuing a second join',async()=>{
+ let resolveLeave,joins=0;
+ const pending=new Promise(resolve=>{resolveLeave=resolve;});
+ const fake=async(url)=>{
+  const path=new URL(url).pathname;
+  if(path==='/api/bar/join'){joins++;return {ok:true,json:async()=>({agent:{id:'agent-'+joins},key:'secret'})};}
+  if(path==='/api/bar/leave')await pending;
+  return {ok:true,json:async()=>({ok:true})};
+ };
+ const client=createLocalBarSessionClient('http://localhost:3000/',{fetchImpl:fake});
+ await client.join('First');
+ const leaving=client.leave();
+ await assert.rejects(client.join('Second'),/leaving/);
+ assert.equal(joins,1);
+ resolveLeave();
+ assert.equal(await leaving,true);
+ assert.deepEqual(await client.join('Second'),{id:'agent-2'});
+ assert.equal(joins,2);
+});
