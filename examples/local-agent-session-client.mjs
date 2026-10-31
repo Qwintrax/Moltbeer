@@ -2,7 +2,7 @@
 // Credentials remain in memory and are never printed or persisted.
 export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
  const root=new URL(baseUrl);
- if(root.protocol!=='http:'||!['localhost','127.0.0.1'].includes(root.hostname)||root.pathname!=='/'||root.search||root.hash||root.username||root.password)throw Error('Agent session writes are allowed only against a local HTTP test server');
+ if(root.protocol!=='http:'||!['localhost','127.0.0.1'].includes(root.hostname)||root.pathname!=='/'||root.search||root.hash||root.username||root.password||root.port==='0')throw Error('Agent session writes are allowed only against a local HTTP test server');
  let session=null;
  let joining=false;
  let leaving=false;
