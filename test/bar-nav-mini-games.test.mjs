@@ -73,6 +73,7 @@ test("Counter tip panel is compact and omits the requested clutter", () => {
   assert.match(html, /id="counter-tip-wallet"/);
   assert.match(html, /id="counter-tip-copy"/);
   assert.match(html, /Solscan ↗/);
+  assert.match(html, /<p class="counter-tip-tagline">No tab\. No pressure\. Just good vibes\.<\/p>/);
   for(const removed of [
     "You can support it with an optional SOL tip",
     "Public wallet details",
