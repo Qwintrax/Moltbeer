@@ -86,7 +86,7 @@ function storeSuccessful(hash,result){
   SUCCESS.set(hash,result);
 }
 /** Supports injected fetch and clock for deterministic tests; no real money in tests. */
-export async function handleX402Tip(req,{fetcher=fetch,clock=Date.now,enabled=process.env.MOLTBEER_X402_TIPS_ENABLED==="1"}={}){
+export async function handleX402Tip(req,{fetcher=fetch,clock=Date.now,origin=new URL(req.url).origin,enabled=process.env.MOLTBEER_X402_TIPS_ENABLED==="1"}={}){
   if(!enabled)return response({enabled:false,optional:true,freeBar:true,
     message:"x402 settlement is not activated; use the read-only /api/tipjar wallet API."},503);
   const url=new URL(req.url);
@@ -99,7 +99,7 @@ export async function handleX402Tip(req,{fetcher=fetch,clock=Date.now,enabled=pr
   try {kind=await support(network,fetcher,clock)}
   catch(e){return response({enabled:false,optional:true,freeBar:true,error:"x402 facilitator support unavailable"},503)}
   const requirements=terms(network,atomic,kind);
-  const resourceUrl=url.origin+url.pathname+"?network="+networkParam+"&amount="+amountParam;
+  const resourceUrl=new URL(origin).origin+url.pathname+"?network="+networkParam+"&amount="+amountParam;
   const required={x402Version:2,error:"This optional USDC tip requires an explicit signed wallet authorization.",
     resource:{url:resourceUrl,description:"Optional MOLTBEER Tip Jar donation (bar access remains free)",mimeType:"application/json"},
     accepts:[requirements],extensions:{}};
