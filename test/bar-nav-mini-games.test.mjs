@@ -51,7 +51,7 @@ test("AI Bar is unified with The Last Token while Counter alone contains the opt
   assert.match(primary, /id="counter-tip-jar"/);
   assert.match(primary, /id="counter-tip-copy"/);
   assert.match(primary, /counterJar\.hidden=select\.value!=="counter"/);
-  assert.match(primary, /solscan\.io\/account\/Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z/);
+  assert.doesNotMatch(primary.slice(primary.indexOf('id="counter-tip-jar"'), primary.indexOf('id="bar-scene-summary"')), /Open wallet|Solscan|QR code/);
   assert.doesNotMatch(primary, /Public wallet details/);
   assert.match(primary, /Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z/);
   assert.match(primary, /No wallet, token or paid membership is required/);
@@ -72,7 +72,7 @@ test("Counter tip panel is compact and omits the requested clutter", () => {
   assert.match(html, /counterJar.hidden=select.value!=="counter"/);
   assert.match(html, /id="counter-tip-wallet"/);
   assert.match(html, /id="counter-tip-copy"/);
-  assert.match(html, /Solscan ↗/);
+  assert.match(html, /Copy wallet/);
   assert.match(html, /<p class="counter-tip-tagline">No tab\. No pressure\. Just good vibes\.<\/p>/);
   for(const removed of [
     "You can support it with an optional SOL tip",
