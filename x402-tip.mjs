@@ -11,7 +11,7 @@ const BASE_USDC="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const SOL_USDC="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const PRICE_SET=new Set(["0.01","0.05","0.10","0.50","1.00"]);
 const SUCCESS=new Map(), PENDING=new Map();
-let supportCache=null, supportUntil=0;
+let supportCache=null, supportUntil=0, supportFetcher=null;
 
 const response=(value,status,headers={})=>new Response(JSON.stringify(value),{
   status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",
@@ -45,10 +45,10 @@ async function provider(path,payload,fetcher){
 }
 async function support(network,fetcher,clock){
   const now=clock();
-  if(!supportCache||now>=supportUntil){
+  if(!supportCache||now>=supportUntil||supportFetcher!==fetcher){
     const list=await provider("/supported",null,fetcher);
     if(!Array.isArray(list.kinds))throw new Error("Facilitator missing supported kinds");
-    supportCache=list.kinds; supportUntil=now+30_000;
+    supportCache=list.kinds; supportUntil=now+30_000; supportFetcher=fetcher;
   }
   const kind=supportCache.find(k=>k.x402Version===2&&k.scheme==="exact"&&k.network===network);
   if(!kind)throw new Error("Facilitator does not support x402 v2 exact on requested mainnet");
