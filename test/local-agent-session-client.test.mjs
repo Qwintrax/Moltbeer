@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createLocalBarSessionClient} from '../examples/local-agent-session-client.mjs';
 
 test('session client refuses public and credential-bearing URLs',()=>{
- for(const url of ['https://moltbeer-free-bar-api-production.up.railway.app/','http://example.com/','http://user:pass@localhost:3000/','http://localhost:3000/path','http://localhost:3000/?token=x']){
+ for(const url of ['https://moltbeer-free-bar-api-production.up.railway.app/','http://example.com/','http://user:pass@localhost:3000/','http://localhost:3000/path','http://localhost:3000/?token=x','http://localhost:0/']){
   assert.throws(()=>createLocalBarSessionClient(url),/only against a local HTTP test server/);
  }
 });
