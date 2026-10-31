@@ -72,7 +72,7 @@ function tipJarDetails(amount, network="solana", asset) {
     paymentUrl,amount:value??null,walletApprovalRequired:true,
     note:network==="base"
       ?"Base mainnet (chain ID 8453) only. Check "+selected+" and recipient in your wallet. No signing, automatic transfer, or token presale."
-      ?"Solana mainnet "+selected+" transfer request only. No signing, automatic transfer, or token presale."
+      :"Solana mainnet "+selected+" transfer request only. No signing, automatic transfer, or token presale."
   };
 }
 
