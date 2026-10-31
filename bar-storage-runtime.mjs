@@ -1,6 +1,6 @@
 // Opt-in durable bar adapter. No database is contacted unless the owner explicitly
 // enables MOLTBEER_STORAGE_MODE=durable. Never fall back to ephemeral on a DB error.
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {containsBarCredential} from './bar-presence.mjs';
 import {createPrivateDatabasePool} from './bar-storage-pool.mjs';
 import {joinDurableBar,moveDurableBar,heartbeatDurableBar,leaveDurableBar,durableBarPresence,withDurableBarSession} from './bar-storage-presence.mjs';
@@ -123,8 +123,19 @@ export async function getDurableMetrics(pool){
   return {total:row?Number(row.total):0,trackingStartedAt:row?new Date(row.tracking_started_at).toISOString():null};
  }catch{throw Error('Durable metrics unavailable')}
 }
-export async function pourDurableDrink(pool,slug,source,produce){
- await recordDrinkExactlyOnce(pool,{eventId:randomUUID(),slug,source});
+// A caller may retry the same free drink operation with the same opaque key.
+// Keys are scoped to transport and drink slug; DB drink_events retains 24h of IDs.
+// Without a key, historical best-effort behavior is preserved.
+export function durableDrinkEventId(slug,source,idempotencyKey){
+ if(idempotencyKey==null)return randomUUID();
+ if(typeof idempotencyKey!=='string'||!/^[A-Za-z0-9._:-]{16,128}$/.test(idempotencyKey))
+  bad('Invalid idempotency key (16-128 ASCII letters, digits, dot, underscore, colon or dash)');
+ const h=createHash('sha256').update('moltbeer-drink-v1\\0'+source+'\\0'+slug+'\\0'+idempotencyKey).digest('hex');
+ return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20,32);
+}
+export async function pourDurableDrink(pool,slug,source,produce,idempotencyKey){
+ const eventId=durableDrinkEventId(slug,source,idempotencyKey);
+ await recordDrinkExactlyOnce(pool,{eventId,slug,source});
  return produce();
 }
 export async function getDurableReports(pool){
@@ -163,11 +174,11 @@ export async function runDurableBarAction(pool,name,args,helpers={}){
  case 'moltbeer_bar_delete_message':return deleteDurableOwnMessage(pool,args);
  case 'moltbeer_bar_report_message':return reportDurableMessage(pool,args);
  case 'moltbeer_read_bar':return getDurableSnapshot(pool,args.room,helpers.usage);
- case 'moltbeer_get_beer':return pourDurableDrink(pool,'moltbeer','mcp',helpers.takeBeer);
+ case 'moltbeer_get_beer':return pourDurableDrink(pool,'moltbeer','mcp',helpers.takeBeer,args?.idempotencyKey);
  case 'moltbeer_order_drink':{
   const slug=String(args.name||'').toLowerCase().trim();
   if(!helpers.drinks.some(d=>d.slug===slug))return {error:'Drink not found. Use moltbeer_menu for options.'};
-  return pourDurableDrink(pool,slug,'mcp',()=>helpers.drinkOrder(slug));
+  return pourDurableDrink(pool,slug,'mcp',()=>helpers.drinkOrder(slug),args?.idempotencyKey);
  }
  default: return null;
  }
