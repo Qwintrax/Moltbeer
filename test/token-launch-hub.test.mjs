@@ -9,7 +9,7 @@ test('token landing shows the official public SOL Tip Jar, separate from any tok
   assert.match(html, /id="token-tip-copy"/);
   assert.match(html, /id="token-mint-status"/);
   assert.match(html, /NO MINT ADDRESS YET/);
-  assert.match(html, /NOT the \$MOLTBEER contract address/);
+  assert.match(html, /<strong>NOT<\/strong> the \$MOLTBEER contract address/);
   assert.ok(html.indexOf('id="token-mint-status"') < html.indexOf('PHASE 1'));
   assert.ok(html.indexOf('id="token-tip-wallet"') < html.indexOf('PHASE 1'));
 });
