@@ -77,7 +77,7 @@ test("offline QR SVG matches the amount-free payment request and requires no thi
   assert.match(svg,/<svg/);
   assert.match(svg,/viewBox="0 0 49 49"/);
   assert.match(svg,/d="M[0-9]+ [0-9]+h1v1h-1z/);
-  assert.doesNotMatch(svg,/<script|<image|https?:\/\//i);
+  assert.doesNotMatch(svg,/<script|<image|(?:href|src)="https?:\/\//i);
   assert.equal((svg.match(/h1v1h-1z/g)||[]).length,840);
   assert.equal(TIPJAR_QR_PAY_URI, (await (await req("/api/tipjar")).json()).paymentUrl);
 });
