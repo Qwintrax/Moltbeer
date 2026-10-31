@@ -6,12 +6,12 @@ test('token landing shows the official public SOL Tip Jar, separate from any tok
   const html = renderPage('/token');
   assert.ok(html);
   assert.match(html, /Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z/);
-  assert.match(html, /id="token-tip-copy"/);
+  assert.match(html, /id="token-public-copy"/);
   assert.match(html, /id="token-mint-status"/);
   assert.match(html, /NO MINT ADDRESS YET/);
   assert.match(html, /<strong>NOT<\/strong> the \$MOLTBEER contract address/);
   assert.ok(html.indexOf('id="token-mint-status"') < html.indexOf('PHASE 1'));
-  assert.ok(html.indexOf('id="token-tip-wallet"') < html.indexOf('PHASE 1'));
+  assert.ok(html.indexOf('id="token-public-wallet"') < html.indexOf('PHASE 1'));
 });
 
 test('launch resources are honest about what is not yet officially published', () => {
@@ -41,11 +41,11 @@ test('token page redesign uses public wallet wording, readable mobile layout and
   const html = renderPage('/token');
   assert.match(html, /OFFICIAL PUBLIC WALLET/);
   assert.match(html, /<h3>Public wallet<\/h3>/);
-  assert.doesNotMatch(html, /Tip Jar|tip jar|TipJar/);
+  assert.doesNotMatch(html, /Tip Jar|tip jar|TipJar|token-tip-/);
   assert.match(html, /\.tp-hero/);
   assert.match(html, /@media\(max-width:650px\)/);
   assert.match(html, /Official MOLTBEER red robot mascot logo/);
   assert.match(html, /TOKEN NOT LAUNCHED/);
   assert.ok(html.indexOf('id="token-mint-status"') < html.indexOf('PHASE 1'));
-  assert.ok(html.indexOf('id="token-tip-wallet"') < html.indexOf('PHASE 1'));
+  assert.ok(html.indexOf('id="token-public-wallet"') < html.indexOf('PHASE 1'));
 });
