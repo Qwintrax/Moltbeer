@@ -133,3 +133,27 @@ test('pending leave blocks heartbeat, move and chat until completion',async()=>{
  assert.equal(await leaving,true);
  assert.equal(client.joined,false);
 });
+
+test('HTTP errors do not leak agent session credentials or discard active session',async()=>{
+ let heartbeatFailed=true,leaveFailed=true;
+ const fake=async(url)=>{
+  const path=new URL(url).pathname;
+  if(path==='/api/bar/join')return {ok:true,json:async()=>({agent:{id:'private-agent'},key:'super-secret-test-key'})};
+  if(path==='/api/bar/heartbeat'&&heartbeatFailed){heartbeatFailed=false;return {ok:false,status:503};}
+  if(path==='/api/bar/leave'&&leaveFailed){leaveFailed=false;return {ok:false,status:503};}
+  return {ok:true,json:async()=>({ok:true})};
+ };
+ const client=createLocalBarSessionClient('http://127.0.0.1:3000/',{fetchImpl:fake});
+ await client.join('Safe agent');
+ const heartbeat=await client.heartbeat().then(()=>null,error=>error);
+ assert.match(heartbeat.message,/HTTP 503/);
+ assert.doesNotMatch(heartbeat.message,/super-secret-test-key|private-agent/);
+ assert.equal(client.joined,true);
+ await client.heartbeat();
+ const leave=await client.leave().then(()=>null,error=>error);
+ assert.match(leave.message,/HTTP 503/);
+ assert.doesNotMatch(leave.message,/super-secret-test-key|private-agent/);
+ assert.equal(client.joined,true);
+ assert.equal(await client.leave(),true);
+ assert.equal(client.joined,false);
+});
