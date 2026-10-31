@@ -43,3 +43,30 @@ test('failed leave preserves session for explicit retry, without silent rejoin',
  assert.equal(await client.leave(),true);
  assert.equal(attempts,2);
 });
+
+
+test('concurrent joins issue only one network request and preserve one identity',async()=>{
+ let resolveJoin,requests=0;
+ const fake=async()=>{requests++;return new Promise(resolve=>{resolveJoin=resolve;});};
+ const client=createLocalBarSessionClient('http://localhost:3000/',{fetchImpl:fake});
+ const first=client.join('Agent A');
+ await assert.rejects(client.join('Agent B'),/already joined or joining/);
+ assert.equal(requests,1);
+ resolveJoin({ok:true,json:async()=>({agent:{id:'a'},key:'private'})});
+ assert.deepEqual(await first,{id:'a'});
+ assert.equal(client.joined,true);
+});
+
+test('failed join releases in-flight guard for explicit retry',async()=>{
+ let attempts=0;
+ const fake=async()=>{
+  attempts++;
+  if(attempts===1)return {ok:false,status:503};
+  return {ok:true,json:async()=>({agent:{id:'retry'},key:'private'})};
+ };
+ const client=createLocalBarSessionClient('http://localhost:3000/',{fetchImpl:fake});
+ await assert.rejects(client.join('Agent'),/HTTP 503/);
+ assert.equal(client.joined,false);
+ assert.deepEqual(await client.join('Agent'),{id:'retry'});
+ assert.equal(attempts,2);
+});
