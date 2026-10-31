@@ -49,3 +49,23 @@ test('rollback-only adapter rejects direct transaction control and semicolon byp
   await client.query('ROLLBACK');
   assert.deepEqual(sql,['BEGIN','SAVEPOINT moltbeer_accept_1','SELECT 1','RELEASE SAVEPOINT moltbeer_accept_1','ROLLBACK']);
 });
+
+test('acceptance rejects pg query-config objects and comment-hidden transaction commands',async()=>{
+ const sql=[];
+ const client={query:async statement=>{sql.push(statement);return {rowCount:0,rows:[]};}};
+ const pool=rollbackOnlyPool(client);
+ const unsafe=[
+  {text:'COMMIT'},
+  {text:'ROLLBACK'},
+  '/* comment */ COMMIT',
+  '-- comment\\nCOMMIT'.replace('\\n','\n'),
+  'SELECT 1; /* comment */ COMMIT',
+  'SELECT 1; -- comment\\nCOMMIT'.replace('\\n','\n')
+ ];
+ for(const statement of unsafe)assert.throws(()=>pool.query(statement),/Direct transaction control/);
+ const lease=await pool.connect();
+ for(const statement of unsafe)await assert.rejects(lease.query(statement),/Unexpected transaction control/);
+ assert.deepEqual(sql,[],'no unsafe SQL reaches the physical connection');
+ await lease.query('SELECT 1;');
+ assert.deepEqual(sql,['SELECT 1;'],'single benign statement remains supported');
+});

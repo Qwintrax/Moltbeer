@@ -18,7 +18,15 @@ export function rollbackOnlyPool(client){
  let savepoint=null,number=0;
  // Reject direct or unexpected transaction commands so an acceptance adapter
  // cannot accidentally commit the real outer PostgreSQL transaction.
- const isTransactionControl=sql=>typeof sql==='string'&&/(?:^|;)\s*(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE)\b/i.test(sql.trim());
+ // PostgreSQL also accepts query-config objects ({text:'COMMIT'}). Reject them
+ // and SQL comments/multiple statements instead of trying to parse arbitrary SQL:
+ // a comment before COMMIT must never bypass the outer rollback boundary.
+ const isTransactionControl=sql=>{
+  if(typeof sql!=='string')return true;
+  const statement=sql.trim().replace(/;\s*$/,'').trim();
+  return /\/\*|--|;/.test(statement) ||
+   /^(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE)\b/i.test(statement);
+ };
  const lease={
   async query(sql,params){
    const statement=typeof sql==='string'?sql.trim().replace(/;\s*$/,'').trim().toUpperCase():'';
