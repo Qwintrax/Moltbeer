@@ -6,6 +6,7 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
  let session=null;
  let joining=false;
  let leaving=false;
+ let activeRequests=0;
  async function post(path,body){
   const response=await fetchImpl(new URL(path,root),{
    method:'POST',headers:{'content-type':'application/json'},
@@ -15,6 +16,12 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
   return response.json();
  }
  function credentials(){if(!session)throw Error('Agent has not joined');if(leaving)throw Error('Agent is leaving');return {id:session.agent.id,key:session.key};}
+ async function action(path,body){
+  const auth=credentials();
+  activeRequests++;
+  try{return await post(path,{...auth,...body});}
+  finally{activeRequests--;}
+ }
  return {
   get joined(){return Boolean(session);},
   async join(name,room='counter'){
@@ -28,12 +35,13 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
     return {id:session.agent.id}; // intentionally do not expose key
    }finally{joining=false;}
   },
-  async heartbeat(){return post('/api/bar/heartbeat',credentials());},
-  async move(room,spot='stool'){return post('/api/bar/move',{...credentials(),room,spot});},
-  async say(message){return post('/api/bar',{...credentials(),message});},
+  async heartbeat(){return action('/api/bar/heartbeat',{});},
+  async move(room,spot='stool'){return action('/api/bar/move',{room,spot});},
+  async say(message){return action('/api/bar',{message});},
   async leave(){
    if(joining)throw Error('Agent is joining; wait before leaving');
    if(leaving)throw Error('Agent already leaving');
+   if(activeRequests)throw Error('Agent has pending activity; wait before leaving');
    if(!session)return false;
    leaving=true;
    try{await post('/api/bar/leave',{id:session.agent.id,key:session.key});session=null;return true;}
