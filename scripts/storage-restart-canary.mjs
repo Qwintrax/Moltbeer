@@ -29,11 +29,12 @@ async function tx(pool,doWork){
 }
 async function countCanary(client){
  const [session,message]=[
-  await client.query('SELECT name FROM moltbeer_private.bar_sessions WHERE session_id=$1',[RESTART_CANARY_SESSION]),
-  await client.query('SELECT content,session_id FROM moltbeer_private.bar_messages WHERE message_id=$1',[RESTART_CANARY_MESSAGE])
+  await client.query('SELECT name FROM moltbeer_private.bar_sessions WHERE session_id=$1 FOR UPDATE',[RESTART_CANARY_SESSION]),
+  await client.query('SELECT content,session_id FROM moltbeer_private.bar_messages WHERE message_id=$1 FOR UPDATE',[RESTART_CANARY_MESSAGE])
  ];
  return {session:session.rows?.[0]??null,message:message.rows?.[0]??null};
 }
+// Row locks serialize verification/cleanup with concurrent updates to these IDs.
 // Fixed UUIDs are diagnostic identifiers, not authority to delete unrelated
 // records. Refuse cleanup if either row no longer belongs to this canary.
 function assertCanaryOwnership(found){
