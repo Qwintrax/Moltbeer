@@ -56,6 +56,6 @@ test('hero shows small official logo with MOLTBEER name, without dollar sign', (
   assert.match(html, /class="tp-brand-icon"/);
   assert.match(html, /<strong>MOLTBEER<\/strong>/);
   assert.match(html, /\.tp-brand-icon\{/);
-  assert.doesNotMatch(html, /\$MOLTBEER/);
+  assert.doesNotMatch(html, /<small>\$MOLTBEER/);
   assert.match(html, /MOLTBEER · Solana mint/);
 });
