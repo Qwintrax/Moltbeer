@@ -44,3 +44,19 @@ test('acceptance rolls back outer real transaction after an adapter failure',asy
 test('acceptance requires a real PostgreSQL connection handle',async()=>{
  await assert.rejects(verifyDurableStorageRollback(null),/pool unavailable/);
 });
+
+test('acceptance never persists a failed outer transaction and releases its client',async()=>{
+ const queries=[];let released=0;
+ const client={
+  query:async(sql)=>{queries.push(sql);if(sql==='SAVEPOINT moltbeer_accept_1')throw Error('postgresql://user:secret@private-db');return {rowCount:0,rows:[]}},
+  release:()=>{released++}
+ };
+ await assert.rejects(verifyDurableStorageRollback({connect:async()=>client}),err=>{
+  assert.match(err.message,/Private rollback acceptance failed at join and move/);
+  assert.doesNotMatch(err.message,/secret|private-db|postgresql/);
+  return true;
+ });
+ assert.deepEqual(queries.slice(0,3),['BEGIN','SAVEPOINT moltbeer_accept_1','ROLLBACK']);
+ assert.equal(released,1);
+ assert.equal(queries.includes('COMMIT'),false);
+});
