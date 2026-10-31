@@ -43,6 +43,24 @@ try{
  const deleted=await call('/api/bar/message/delete',{...poster,messageId},count+5);
  assert.equal(deleted.status,200);assert.equal(deleted.body.deleted,true);checks++;
  const afterDelete=await call('/api/bar');assert.ok(!afterDelete.body.messages.some(m=>m.id===messageId));checks++;
+ // Reconnect: a passive read does not extend a session, but an authenticated
+ // heartbeat does. A stale key must not regain access after an explicit leave.
+ const heartbeat=await call('/api/bar/heartbeat',{...poster},count+6);
+ assert.equal(heartbeat.status,200);assert.equal(heartbeat.body.ok,true);checks++;
+ const oldKey=poster.key;
+ const departure=await call('/api/bar/leave',{...poster},count+7);
+ assert.equal(departure.status,200);checks++;
+ sessions.shift(); // The old session is already removed, do not delete twice.
+ const expired=await call('/api/bar/heartbeat',{id:poster.id,key:oldKey},count+8);
+ assert.equal(expired.status,400);checks++;
+ const rejoined=await call('/api/bar/join',{name:prefix+'0',room:'arcade'},count+9);
+ assert.equal(rejoined.status,201);assert.notEqual(rejoined.body.agent.id,poster.id);
+ assert.notEqual(rejoined.body.key,oldKey);checks++;
+ sessions.unshift({id:rejoined.body.agent.id,key:rejoined.body.key});
+ const staleMove=await call('/api/bar/move',{id:poster.id,key:oldKey,room:'counter'},count+10);
+ assert.equal(staleMove.status,400);checks++;
+ const freshMove=await call('/api/bar/move',{...sessions[0],room:'counter'},count+11);
+ assert.equal(freshMove.status,200);checks++;
  const denied=await call('/api/bar/move',{id:sessions[0].id,key:'invalid-key',room:'arcade'},0);
  assert.notEqual(denied.status,200);checks++;
 }finally{
@@ -50,6 +68,7 @@ try{
  const after=await call('/api/bar/agents');assert.equal(after.body.agents.filter(a=>a.name.startsWith(prefix)).length,0);checks++;
 }
 console.log(JSON.stringify({ok:true,localOnly:true,agents:count,rounds,checks,durationMs:Math.round(performance.now()-started),remainingTestAgents:0}));
+
 
 
 
