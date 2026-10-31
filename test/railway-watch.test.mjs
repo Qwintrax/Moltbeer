@@ -8,7 +8,8 @@ test('Railway rebuilds for application, startup probes, TLS and assets',()=>{
  for(const path of ['/*.mjs','/scripts/**','/certs/**','/assets/**','/package.json','/railway.json','/test/**']){
   assert.ok(paths.includes(path),path+' must trigger Railway redeploy');
  }
- assert.equal(config.build.buildCommand,'npm test');
+ assert.equal(config.build.buildCommand,'MOLTBEER_STORAGE_MODE=ephemeral npm test');
+ assert.equal(config.deploy.startCommand,'npm start');
  assert.equal(config.deploy.healthcheckPath,'/health');
  assert.equal(config.deploy.sleepApplication,true);
 });
