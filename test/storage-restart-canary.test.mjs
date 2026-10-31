@@ -102,3 +102,20 @@ test('seed and verify require a real deployment ID; cleanup stays possible witho
  assert.equal(pool.state.sessions.size,0);
  assert.equal(pool.state.messages.size,0);
 });
+
+test('a second seed cannot erase committed evidence from the first deployment',async()=>{
+ const pool=memoryDatabase();
+ await runPrivateRestartCanary(pool,'seed',{deploymentId:SEED_ID});
+ assert.equal(pool.state.commits,1);
+ await assert.rejects(runPrivateRestartCanary(pool,'seed',{deploymentId:VERIFY_ID}),/Private restart canary failed/);
+ assert.equal(pool.state.commits,1,'duplicate seed must roll back without replacing evidence');
+ assert.equal(pool.state.sessions.size,1);
+ assert.equal(pool.state.messages.size,1);
+ // The original deployment marker remains intact, so the real verify phase
+ // can still prove that the first committed data survived the next deployment.
+ const result=await runPrivateRestartCanary(pool,'verify',{deploymentId:VERIFY_ID});
+ assert.equal(result.passed,true);
+ assert.equal(pool.state.sessions.size,0);
+ assert.equal(pool.state.messages.size,0);
+ assert.equal(pool.state.commits,2);
+});
