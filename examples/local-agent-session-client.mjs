@@ -18,6 +18,7 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
  return {
   get joined(){return Boolean(session);},
   async join(name,room='counter'){
+   if(leaving)throw Error('Agent is leaving');
    if(session||joining)throw Error('Agent already joined or joining');
    joining=true;
    try{
