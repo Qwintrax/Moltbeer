@@ -1,5 +1,7 @@
 name: MOLTBEER CI
 on:
+  # Run explicitly after Railway has deployed the matching main commit.
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -21,18 +23,16 @@ jobs:
         continue-on-error: true
         timeout-minutes: 3
         run: npm audit --omit=dev --audit-level=high
-      - name: Public bar read-only smoke (non-blocking)
-        if: github.event_name == 'push'
-        continue-on-error: true
-        timeout-minutes: 3
+      - name: Production read-only smoke (post-deploy acceptance)
+        if: github.event_name == 'workflow_dispatch'
+        timeout-minutes: 5
         env:
           MOLTBEER_BASE_URL: https://moltbeer-free-bar-api-production.up.railway.app
           MOLTBEER_EXPECTED_PERSISTENCE: durable
         run: node scripts/smoke-readonly.mjs
-      - name: Comprehensive read-only public API/MCP audit (non-blocking)
-        if: github.event_name == 'push'
-        continue-on-error: true
-        timeout-minutes: 4
+      - name: Production REST/MCP audit (post-deploy acceptance)
+        if: github.event_name == 'workflow_dispatch'
+        timeout-minutes: 5
         env:
           MOLTBEER_BASE_URL: https://moltbeer-free-bar-api-production.up.railway.app
           MOLTBEER_EXPECTED_PERSISTENCE: durable
