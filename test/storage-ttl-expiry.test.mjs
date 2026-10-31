@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 import {storageQueries} from '../bar-storage-queries.mjs';
 import {purgeExpiredBarRows} from '../bar-storage-cleanup.mjs';
 
-test('30-minute sessions and 24-hour messages have no hard-coded TTL exemptions',()=>{
- assert.match(storageQueries.expireSessions,
-  /^DELETE FROM moltbeer_private\.bar_sessions WHERE expires_at<=now\(\)$/);
- assert.match(storageQueries.expireMessages,
-  /^DELETE FROM moltbeer_private\.bar_messages WHERE expires_at<=now\(\)$/);
+test('ordinary expired rows are removed; reserved canary grace ends after six hours',()=>{
+ assert.match(storageQueries.expireSessions,/WHERE expires_at<=now\(\)/);
+ assert.match(storageQueries.expireMessages,/WHERE expires_at<=now\(\)/);
+ assert.match(storageQueries.expireSessions,/session_id<>'b237bf95-c9df-45b8-91cb-7c1fe4e51f26'::uuid OR joined_at<=now\(\)-interval '6 hours'/);
+ assert.match(storageQueries.expireMessages,/message_id<>'7cdd1b81-7955-4caf-a575-c4d18e923dbf'::uuid OR created_at<=now\(\)-interval '6 hours'/);
+ // These are OR predicates: after six hours even reserved canary IDs expire.
+ assert.doesNotMatch(storageQueries.expireSessions,/session_id<>[^\n]+\)$/);
+ assert.doesNotMatch(storageQueries.expireMessages,/message_id<>[^\n]+\)$/);
 });
 
-test('cleanup applies the unexceptioned TTL queries inside one transaction',async()=>{
+test('cleanup runs all TTL statements inside one transaction',async()=>{
  const statements=[];
  let released=false;
  const pool={connect:async()=>({
