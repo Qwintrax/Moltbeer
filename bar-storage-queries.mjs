@@ -22,8 +22,8 @@ export const storageQueries = Object.freeze({
   eraseSession: `DELETE FROM moltbeer_private.bar_sessions WHERE session_id=$1 RETURNING session_id`,
   eraseOwnMessage: `DELETE FROM moltbeer_private.bar_messages
     WHERE message_id=$1 AND session_id=$2 RETURNING message_id`,
-  expireSessions: `DELETE FROM moltbeer_private.bar_sessions WHERE expires_at<=now() AND session_id<>'b237bf95-c9df-45b8-91cb-7c1fe4e51f26'::uuid`,
-  expireMessages: `DELETE FROM moltbeer_private.bar_messages WHERE expires_at<=now() AND message_id<>'7cdd1b81-7955-4caf-a575-c4d18e923dbf'::uuid`,
+  expireSessions: `DELETE FROM moltbeer_private.bar_sessions WHERE expires_at<=now()\n    AND (session_id<>'b237bf95-c9df-45b8-91cb-7c1fe4e51f26'::uuid OR joined_at<=now()-interval '6 hours')`,
+  expireMessages: `DELETE FROM moltbeer_private.bar_messages WHERE expires_at<=now()\n    AND (message_id<>'7cdd1b81-7955-4caf-a575-c4d18e923dbf'::uuid OR created_at<=now()-interval '6 hours')`,
   // A session expiry cascades its signed messages, but report.message_id is
   // text without a message FK. Remove those orphaned reports in the same
   // maintenance transaction rather than retaining deleted-message metadata.

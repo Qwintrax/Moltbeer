@@ -1,5 +1,5 @@
 // MOLTBEER owner's private, restart-spanning database canary.
-// ONLY runs under an explicit owner startup flag; private expired records are\n// excluded from scheduled retention by their reserved diagnostic UUIDs.
+// ONLY runs under an explicit owner startup flag; reserved diagnostic UUIDs\n// receive a six-hour cleanup grace, then expire even if verify never ran.
 // One synthetic session/message in the *private DB only*, never injected into
 // public REST, MCP or the visitor counter. Rows are inserted already expired
 // so public durable REST/MCP cannot display this fake agent.
