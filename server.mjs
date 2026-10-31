@@ -406,7 +406,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     // internal diagnostic identity to live visitors or inflate public totals.
     // The owner explicitly selects seed, verify, cleanup or disables the flag.
     const canaryPhase=process.env.MOLTBEER_RESTART_CANARY_PHASE;
-    if(["seed","verify","cleanup"].includes(canaryPhase) && !durableModeEnabled()){
+    if(["seed","verify","cleanup"].includes(canaryPhase)){
       let canaryPool;
       try{
         const [{Pool},{createPrivateDatabasePool},{runPrivateRestartCanary}]=await Promise.all([
