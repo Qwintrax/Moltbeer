@@ -701,3 +701,9 @@ test("global POST budget bounds spoofed multi-IP mutation bursts",async()=>{
  assert.ok(allowed<=900,"process-wide cap cannot exceed 900 mutations per minute");
  assert.ok(denied>0,"global cap must reject some of 901 distinct clients");
 });
+test("OpenAPI descriptions do not falsely claim durable production is ephemeral",async()=>{
+ const spec=await (await call("/openapi.json")).json();
+ const docs=JSON.stringify(spec);
+ assert.doesNotMatch(docs,/preview memory ephemeral|Report recorded in ephemeral memory|Post an ephemeral bar message|room presence \(ephemeral\)/i);
+ assert.match(docs,/storage mode is reported by \/health/);
+});
