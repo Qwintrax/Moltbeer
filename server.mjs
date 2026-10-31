@@ -354,7 +354,7 @@ export async function fetchApp(req){
   if(req.method==="GET" && (p==="/api/drink"||p==="/drink")){if(isPassiveDrinkRequest(req.headers))return passiveDrinkDenied();const slug=String(url.searchParams.get("name")||"").toLowerCase().trim();if(!DRINKS.some(d=>d.slug===slug))return error("Drink not found. See /api/menu",404);if(!canServeDrink(req))return drinkThrottled();return json(drinkOrder(slug))}
   if(req.method==="GET" && p==="/api/tipjar"){try{return json(tipJarDetails(url.searchParams.has("amount")?url.searchParams.get("amount"):undefined,url.searchParams.has("network")?url.searchParams.get("network"):"solana",url.searchParams.has("asset")?url.searchParams.get("asset"):undefined))}catch(e){return error(e.message,400)}}
   if(req.method==="GET" && p==="/api/tipjar/x402/info")return json({...X402_PUBLIC_INFO,enabled:process.env.MOLTBEER_X402_TIPS_ENABLED==="1",barAlwaysFree:true});
-  if(req.method==="GET" && p==="/api/tipjar/x402")return handleX402Tip(req);
+  if(req.method==="GET" && p==="/api/tipjar/x402")return handleX402Tip(req,{origin});
   // x402 is a separate opt-in route; existing /api/beer, /api/bar and other APIs never require payment.
   if(req.method==="GET" && p==="/api/tipjar/qr.svg"){
     // Static QR matches the unamounted transfer request. No transaction or transfer occurs.

@@ -135,3 +135,14 @@ test("OpenAPI and generated agent skill describe opt-in x402 only, with free cor
  assert.match(skill,/wallet owner has explicitly approved/);
  assert.match(skill,/free bar and all drinks never require payment/);
 });
+
+test("x402 signs publicly reachable Railway URL instead of internal localhost",async()=>{
+ const fac=mockFacilitator();
+ const publicOrigin="https://moltbeer-free-bar-api-production.up.railway.app";
+ const request=GET("/api/tipjar/x402?network=base&amount=0.01");
+ const result=await handleX402Tip(request,{fetcher:fac.fetcher,enabled:true,origin:publicOrigin});
+ assert.equal(result.status,402);
+ const decoded=decode(result.headers.get("payment-required"));
+ assert.equal(decoded.resource.url,publicOrigin+"/api/tipjar/x402?network=base&amount=0.01");
+ assert.ok(!decoded.resource.url.includes("localhost"));
+});
