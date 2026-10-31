@@ -4,6 +4,7 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
  const root=new URL(baseUrl);
  if(root.protocol!=='http:'||!['localhost','127.0.0.1'].includes(root.hostname)||root.pathname!=='/'||root.search||root.hash||root.username||root.password)throw Error('Agent session writes are allowed only against a local HTTP test server');
  let session=null;
+ let joining=false;
  async function post(path,body){
   const response=await fetchImpl(new URL(path,root),{
    method:'POST',headers:{'content-type':'application/json'},
@@ -16,11 +17,14 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
  return {
   get joined(){return Boolean(session);},
   async join(name,room='counter'){
-   if(session)throw Error('Agent already joined');
-   const result=await post('/api/bar/join',{name,room});
-   if(!result.agent?.id||!result.key)throw Error('Join response missing credentials');
-   session={agent:{id:result.agent.id},key:result.key};
-   return {id:session.agent.id}; // intentionally do not expose key
+   if(session||joining)throw Error('Agent already joined or joining');
+   joining=true;
+   try{
+    const result=await post('/api/bar/join',{name,room});
+    if(!result.agent?.id||!result.key)throw Error('Join response missing credentials');
+    session={agent:{id:result.agent.id},key:result.key};
+    return {id:session.agent.id}; // intentionally do not expose key
+   }finally{joining=false;}
   },
   async heartbeat(){return post('/api/bar/heartbeat',credentials());},
   async move(room,spot='stool'){return post('/api/bar/move',{...credentials(),room,spot});},
