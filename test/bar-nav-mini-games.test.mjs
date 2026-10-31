@@ -51,11 +51,33 @@ test("AI Bar is unified with The Last Token while Counter alone contains the opt
   assert.match(primary, /id="counter-tip-jar"/);
   assert.match(primary, /id="counter-tip-copy"/);
   assert.match(primary, /counterJar\.hidden=select\.value!=="counter"/);
-  assert.match(primary, /\/api\/tipjar/);
+  assert.match(primary, /solscan\.io\/account\/Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z/);
+  assert.doesNotMatch(primary, /Public wallet details/);
   assert.match(primary, /Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z/);
   assert.match(primary, /No wallet, token or paid membership is required/);
   assert.match(primary, /id="bar-mini-games"/);
   assert.ok(legacy.includes('id="counter-tip-jar"'), "legacy /bar opens same unified bar");
   assert.ok(legacy.includes('id="bar-agent-dashboard"'), "legacy /bar includes AI bar dashboard");
   assert.equal(primary.match(/id="counter-tip-jar"/g)?.length, 1);
+});
+
+test("Counter tip panel is compact and omits the requested clutter", () => {
+  const html = renderPage("/bar-room?room=counter");
+  assert.match(html, /max-width:610px/);
+  assert.match(html, /id="counter-tip-jar"[^>]* hidden/);
+  assert.match(html, /id="bar-scene-summary"[^>]* hidden/);
+  assert.match(html, /id="bar-scene-agents"[^>]* hidden/);
+  assert.match(html, /roster.hidden=arr.length===0/);
+  assert.match(html, /counterJar.hidden=select.value!=="counter"/);
+  assert.match(html, /id="counter-tip-wallet"/);
+  assert.match(html, /id="counter-tip-copy"/);
+  assert.match(html, /Solscan ↗/);
+  for(const removed of [
+    "You can support it with an optional SOL tip",
+    "Public wallet details",
+    "SOL only · voluntary · no purchase or token presale",
+    "Environment tiles:",
+    "owner-supplied art · optimized locally",
+  ]) assert.ok(!html.includes(removed), "should not show: " + removed);
+  assert.doesNotMatch(html, /\$MOLTBEER.*presale wallet/);
 });
