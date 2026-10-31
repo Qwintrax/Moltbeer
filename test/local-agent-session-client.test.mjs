@@ -177,3 +177,25 @@ test('join during pending leave is rejected without issuing a second join',async
  assert.deepEqual(await client.join('Second'),{id:'agent-2'});
  assert.equal(joins,2);
 });
+
+test('leave refuses in-flight activity until request settles',async()=>{
+ let releaseAction,actionCalls=0,leaveCalls=0;
+ const pending=new Promise(resolve=>{releaseAction=resolve;});
+ const fake=async(url)=>{
+  const path=new URL(url).pathname;
+  if(path==='/api/bar/join')return {ok:true,json:async()=>({agent:{id:'agent'},key:'secret'})};
+  if(path==='/api/bar/heartbeat'){actionCalls++;await pending;}
+  if(path==='/api/bar/leave')leaveCalls++;
+  return {ok:true,json:async()=>({ok:true})};
+ };
+ const client=createLocalBarSessionClient('http://localhost:3000/',{fetchImpl:fake});
+ await client.join('Agent');
+ const active=client.heartbeat();
+ await assert.rejects(client.leave(),/pending activity/);
+ assert.equal(actionCalls,1);
+ assert.equal(leaveCalls,0);
+ releaseAction();
+ await active;
+ assert.equal(await client.leave(),true);
+ assert.equal(leaveCalls,1);
+});
