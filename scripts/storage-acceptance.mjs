@@ -16,9 +16,12 @@ import {purgeExpiredBarRows} from '../bar-storage-cleanup.mjs';
 // writes. COMMIT becomes RELEASE SAVEPOINT; the outer ROLLBACK is unconditional.
 export function rollbackOnlyPool(client){
  let savepoint=null,number=0;
+ // Reject direct or unexpected transaction commands so an acceptance adapter
+ // cannot accidentally commit the real outer PostgreSQL transaction.
+ const isTransactionControl=sql=>typeof sql==='string'&&/(?:^|;)\s*(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE)\b/i.test(sql.trim());
  const lease={
   async query(sql,params){
-   const statement=typeof sql==='string'?sql.trim().toUpperCase():'';
+   const statement=typeof sql==='string'?sql.trim().replace(/;\s*$/,'').trim().toUpperCase():'';
    if(statement==='BEGIN'){
     if(savepoint)throw Error('Concurrent transaction in isolated acceptance probe');
     savepoint='moltbeer_accept_'+(++number);
@@ -35,11 +38,18 @@ export function rollbackOnlyPool(client){
     await client.query('ROLLBACK TO SAVEPOINT '+name);
     return client.query('RELEASE SAVEPOINT '+name);
    }
+   if(isTransactionControl(sql))throw Error('Unexpected transaction control in isolated acceptance probe');
    return client.query(sql,params);
   },
   release(){}
  };
- return {connect:async()=>lease,query:(sql,params)=>client.query(sql,params)};
+ return {
+  connect:async()=>lease,
+  query:(sql,params)=>{
+   if(isTransactionControl(sql))throw Error('Direct transaction control forbidden in isolated acceptance probe');
+   return client.query(sql,params);
+  }
+ };
 }
 
 export async function verifyDurableStorageRollback(pool){

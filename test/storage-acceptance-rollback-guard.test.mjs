@@ -29,3 +29,23 @@ test('rollback-only adapter rejects unbalanced nested transactions', async () =>
   await lease.query('ROLLBACK');
   assert.deepEqual(sql,['SAVEPOINT moltbeer_accept_1','ROLLBACK TO SAVEPOINT moltbeer_accept_1','RELEASE SAVEPOINT moltbeer_accept_1']);
 });
+
+test('rollback-only adapter rejects direct transaction control and semicolon bypasses', async () => {
+  const sql=[];
+  const client={query:async statement=>{sql.push(statement);return {rowCount:0,rows:[]};}};
+  const pool=rollbackOnlyPool(client);
+  assert.throws(()=>pool.query('COMMIT'),/Direct transaction control/);
+  assert.throws(()=>pool.query('ROLLBACK;'),/Direct transaction control/);
+  assert.throws(()=>pool.query('START TRANSACTION'),/Direct transaction control/);
+  assert.throws(()=>pool.query('SELECT 1; COMMIT'),/Direct transaction control/);
+  const lease=await pool.connect();
+  await assert.rejects(lease.query('COMMIT;'),/Missing acceptance savepoint/);
+  await client.query('BEGIN');
+  await lease.query('BEGIN;');
+  await lease.query('SELECT 1');
+  await assert.rejects(lease.query('SELECT 1; COMMIT'),/Unexpected transaction control/);
+  await lease.query('COMMIT;');
+  await assert.rejects(lease.query('ROLLBACK;'),/Missing acceptance savepoint/);
+  await client.query('ROLLBACK');
+  assert.deepEqual(sql,['BEGIN','SAVEPOINT moltbeer_accept_1','SELECT 1','RELEASE SAVEPOINT moltbeer_accept_1','ROLLBACK']);
+});
