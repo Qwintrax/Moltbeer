@@ -42,3 +42,16 @@ test('retention also removes reports orphaned by expired session cascade',async(
  assert.match(sql,/m\.message_id::text=r\.message_id/);
  assert.equal(x.calls.at(-1),'COMMIT');
 });
+
+test('cleanup executes all five bounded retention deletes in order',async()=>{
+ const x=fixture();await purgeExpiredBarRows(x.pool);
+ const statements=x.calls.filter(s=>s.startsWith('DELETE FROM moltbeer_private.'));
+ assert.equal(statements.length,5);
+ for(const table of ['bar_sessions','bar_messages','bar_reports','bar_moderation_audit','drink_events']){
+  assert.ok(statements.some(s=>s.includes('moltbeer_private.'+table)),'missing '+table);
+ }
+ assert.match(statements.find(s=>s.includes('bar_sessions')),/expires_at<=now\(\)/);
+ assert.match(statements.find(s=>s.includes('bar_messages')),/expires_at<=now\(\)/);
+ assert.match(statements.find(s=>s.includes('drink_events')),/interval '24 hours'/);
+ assert.equal(x.calls.at(-1),'COMMIT');
+});
