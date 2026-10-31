@@ -36,3 +36,16 @@ test('phase one checklist shows existing product work and pending token launch c
   assert.match(html, /free digital bar/);
   assert.match(html, /Deferred — not Phase 1/);
 });
+
+test('token page redesign uses public wallet wording, readable mobile layout and preserves logo', () => {
+  const html = renderPage('/token');
+  assert.match(html, /OFFICIAL PUBLIC WALLET/);
+  assert.match(html, /<h3>Public wallet<\/h3>/);
+  assert.doesNotMatch(html, /Tip Jar|tip jar|TipJar/);
+  assert.match(html, /\.tp-hero/);
+  assert.match(html, /@media\(max-width:650px\)/);
+  assert.match(html, /Official MOLTBEER red robot mascot logo/);
+  assert.match(html, /TOKEN NOT LAUNCHED/);
+  assert.ok(html.indexOf('id="token-mint-status"') < html.indexOf('PHASE 1'));
+  assert.ok(html.indexOf('id="token-tip-wallet"') < html.indexOf('PHASE 1'));
+});
