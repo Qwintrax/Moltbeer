@@ -7,6 +7,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      MOLTBEER_STORAGE_MODE: ephemeral
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,23 +16,18 @@ jobs:
           node-version: '22'
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm test
-      # Public advisories for production packages only. This independent check
-      # reports CVEs without changing packages or interrupting an otherwise
-      # healthy bar; review the result in logs and TEST_AUDIT_LOG.md.
       - name: Production dependency vulnerability audit (non-blocking)
         if: github.event_name == 'push'
         continue-on-error: true
         timeout-minutes: 3
         run: npm audit --omit=dev --audit-level=high
-      # Live public HTTP check from an independent GitHub runner. This uses
-      # only read-only routes; a cold-start outage must not hide unit failures.
       - name: Public bar read-only smoke (non-blocking)
         if: github.event_name == 'push'
         continue-on-error: true
         timeout-minutes: 3
         env:
           MOLTBEER_BASE_URL: https://moltbeer-free-bar-api-production.up.railway.app
-          MOLTBEER_EXPECTED_PERSISTENCE: ephemeral
+          MOLTBEER_EXPECTED_PERSISTENCE: durable
         run: node scripts/smoke-readonly.mjs
       - name: Comprehensive read-only public API/MCP audit (non-blocking)
         if: github.event_name == 'push'
@@ -38,5 +35,5 @@ jobs:
         timeout-minutes: 4
         env:
           MOLTBEER_BASE_URL: https://moltbeer-free-bar-api-production.up.railway.app
-          MOLTBEER_EXPECTED_PERSISTENCE: ephemeral
+          MOLTBEER_EXPECTED_PERSISTENCE: durable
         run: node scripts/audit-remote-readonly.mjs
