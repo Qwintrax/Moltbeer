@@ -115,7 +115,7 @@ test("Tip Jar exposes Base mainnet recipient without changing default Solana beh
   assert.equal(base.autoTip,false);
   assert.equal(base.walletApprovalRequired,true);
   assert.equal(base.paymentUrl,null,"A Solana Pay request must never be used on Base");
-  assert.equal(base.usdc,"not confirmed");
+  assert.equal(base.usdc,"supported");
   assert.match(base.note,/Base mainnet/);
   assert.match(base.note,/No signing, automatic transfer/);
   const solExplicit=await (await req("/api/tipjar?network=solana")).json();
@@ -156,11 +156,100 @@ test("Counter offers a compact Solana/Base network selector and still only Copy 
   const start=html.indexOf('<div id="counter-tip-jar"'),end=html.indexOf('<p id="bar-scene-summary"',start);
   const panel=html.slice(start,end);
   assert.match(panel,/<select id="counter-tip-network"/);
-  assert.match(panel,/value="solana">Solana · SOL/);
-  assert.match(panel,/value="base">Base · ETH/);
+  assert.match(panel,/value="solana">Solana/);
+  assert.match(panel,/value="base">Base/);
+  assert.match(panel,/<select id="counter-tip-asset"/);
+  assert.match(panel,/value="SOL">SOL/);
+  assert.match(panel,/value="USDC">USDC \(native\)/);
   assert.match(html,/tipAddresses=\{solana:"Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z",base:"0xf1c2581CBEdF9020B6269eefAaB1Dc4F1e9261F2"\}/);
   assert.match(html,/navigator.clipboard.writeText\(tipAddress.textContent\)/);
   assert.equal((panel.match(/<button\b/g)||[]).length,1);
   assert.doesNotMatch(panel,/<a\b|Open wallet|QR code|Solscan/);
   assert.doesNotMatch(html,/counter-tip-icon/);
+});
+
+test("Circle native USDC metadata is correct on Solana and Base",async()=>{
+  const sol=await (await req("/api/tipjar?network=solana&asset=USDC")).json();
+  assert.equal(sol.asset,"USDC");
+  assert.equal(sol.accepted,"USDC");
+  assert.equal(sol.address,WALLET);
+  assert.equal(sol.token.mint,"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  assert.equal(sol.token.decimals,6);
+  assert.equal(sol.token.standard,"SPL");
+  assert.equal(sol.usdc,"supported");
+  assert.equal(sol.paymentUrl.startsWith("solana:"+WALLET+"?"),true);
+  const solParams=new URLSearchParams(sol.paymentUrl.split("?")[1]);
+  assert.equal(solParams.get("spl-token"),sol.token.mint);
+  assert.equal(solParams.has("amount"),false);
+  const base=await (await req("/api/tipjar?network=base&asset=USDC")).json();
+  assert.equal(base.network,"base");
+  assert.equal(base.chainId,8453);
+  assert.equal(base.address,BASE_WALLET);
+  assert.equal(base.asset,"USDC");
+  assert.equal(base.accepted,"USDC");
+  assert.equal(base.usdc,"supported");
+  assert.equal(base.token.contract,"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
+  assert.equal(base.token.standard,"ERC-20");
+  assert.equal(base.token.decimals,6);
+  assert.equal(base.paymentUrl,null);
+  assert.equal(base.autoTip,false);
+  assert.equal(base.walletApprovalRequired,true);
+  for(const network of [sol,base])assert.deepEqual(network.assets.map(a=>a.symbol),network.network==="solana"?["SOL","USDC"]:["ETH","USDC"]);
+});
+
+test("Solana USDC payment request handles six decimals and rejects unsafe combinations",async()=>{
+  for(const amount of ["0.000001","1","0.1","100"]){
+    const r=await req("/api/tipjar?network=solana&asset=USDC&amount="+encodeURIComponent(amount));
+    assert.equal(r.status,200,amount);
+    const value=await r.json();
+    assert.equal(value.amount,amount);
+    const params=new URLSearchParams(value.paymentUrl.split("?")[1]);
+    assert.equal(params.get("amount"),amount);
+    assert.equal(params.get("spl-token"),"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+  }
+  for(const amount of ["","0","0.0000001","100.000001","101","1e1","1,2","1&asset=ETH"]){
+    const r=await req("/api/tipjar?network=solana&asset=USDC&amount="+encodeURIComponent(amount));
+    assert.equal(r.status,400,amount);
+    assert.match((await r.json()).error,/Invalid amount/);
+  }
+  for(const [network,asset] of [["solana","ETH"],["base","SOL"],["base","USDbC"],["solana","usdc"],["base","USDT"],["base",""]]){
+    const r=await req("/api/tipjar?network="+encodeURIComponent(network)+"&asset="+encodeURIComponent(asset));
+    assert.equal(r.status,400,network+":"+asset);
+    assert.match((await r.json()).error,/Invalid asset/);
+  }
+  const baseAmount=await req("/api/tipjar?network=base&asset=USDC&amount=1");
+  assert.equal(baseAmount.status,400);
+});
+
+test("MCP correctly discovers native USDC on both networks without transfer capability",async()=>{
+  const list=await mcp(71,"tools/list");
+  const tool=list.data.result.tools.find(x=>x.name==="moltbeer_get_tipjar");
+  assert.ok(tool);
+  assert.deepEqual(tool.inputSchema.properties.asset.enum,["SOL","ETH","USDC"]);
+  for(const [network,addr] of [["solana",WALLET],["base",BASE_WALLET]]){
+    const out=await mcp(72,"tools/call",{name:"moltbeer_get_tipjar",arguments:{network,asset:"USDC"}});
+    assert.equal(out.http,200);
+    assert.equal(out.data.result.isError,false);
+    const value=JSON.parse(out.data.result.content[0].text);
+    assert.equal(value.address,addr);
+    assert.equal(value.accepted,"USDC");
+    assert.equal(value.autoTip,false);
+    assert.equal(value.walletApprovalRequired,true);
+  }
+  const rejected=await mcp(73,"tools/call",{name:"moltbeer_get_tipjar",arguments:{network:"base",asset:"USDbC"}});
+  assert.equal(rejected.data.result.isError,true);
+});
+
+test("Counter retains only Copy wallet with network and native USDC currency selector",()=>{
+  const html=renderPage("/bar-room");
+  const from=html.indexOf('<div id="counter-tip-jar"'),to=html.indexOf('<p id="bar-scene-summary"',from),panel=html.slice(from,to);
+  assert.match(panel,/id="counter-tip-network"/);
+  assert.match(panel,/id="counter-tip-asset"/);
+  assert.match(panel,/USDC \(native\)/);
+  assert.match(html,/tipAssets=\{solana:\["SOL","USDC"\],base:\["ETH","USDC"\]\}/);
+  assert.match(html,/tipAsset\.replaceChildren\(\)/);
+  assert.match(html,/tipAsset\.value=choices\.includes\(previous\)\?previous:choices\[0\]/);
+  assert.match(html,/navigator\.clipboard\.writeText\(tipAddress\.textContent\)/);
+  assert.equal((panel.match(/<button\b/g)||[]).length,1);
+  assert.doesNotMatch(panel,/<a\b|Open wallet|QR code|Solscan/);
 });
