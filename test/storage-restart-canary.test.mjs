@@ -252,10 +252,10 @@ test('private canary seed/verify works while durable public routes are enabled',
  }
 });
 
-test('normal retention skips only fixed private canary IDs',async()=>{
+test('normal retention gives only fixed private canary IDs a bounded six-hour grace',async()=>{
  const {storageQueries}=await import('../bar-storage-queries.mjs');
- assert.match(storageQueries.expireSessions,/session_id<>'b237bf95-c9df-45b8-91cb-7c1fe4e51f26'::uuid/);
- assert.match(storageQueries.expireMessages,/message_id<>'7cdd1b81-7955-4caf-a575-c4d18e923dbf'::uuid/);
+ assert.match(storageQueries.expireSessions,/session_id<>'b237bf95-c9df-45b8-91cb-7c1fe4e51f26'::uuid OR joined_at<=now\(\)-interval '6 hours'/);
+ assert.match(storageQueries.expireMessages,/message_id<>'7cdd1b81-7955-4caf-a575-c4d18e923dbf'::uuid OR created_at<=now\(\)-interval '6 hours'/);
  assert.match(storageQueries.expireSessions,/expires_at<=now\(\)/);
  assert.match(storageQueries.expireMessages,/expires_at<=now\(\)/);
 });
