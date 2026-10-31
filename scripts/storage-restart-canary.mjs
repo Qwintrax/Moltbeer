@@ -34,6 +34,21 @@ async function countCanary(client){
  ];
  return {session:session.rows?.[0]??null,message:message.rows?.[0]??null};
 }
+// Fixed UUIDs are diagnostic identifiers, not authority to delete unrelated
+// records. Refuse cleanup if either row no longer belongs to this canary.
+function assertCanaryOwnership(found){
+ if(found.session && found.session.name!==CANARY_NAME)
+  throw Error('Private canary ownership mismatch');
+ if(found.message){
+  const content=found.message.content;
+  const prefix=CANARY_TEXT+' | deployment=';
+  const seedId=typeof content==='string'&&content.startsWith(prefix)
+   ?content.slice(prefix.length):null;
+  if(!seedId || !DEPLOYMENT_ID.test(seedId) ||
+     String(found.message.session_id)!==RESTART_CANARY_SESSION)
+   throw Error('Private canary ownership mismatch');
+ }
+}
 async function purgeCanary(client){
  await client.query('DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1',[RESTART_CANARY_MESSAGE]);
  await client.query('DELETE FROM moltbeer_private.bar_sessions WHERE session_id=$1',[RESTART_CANARY_SESSION]);
@@ -66,6 +81,8 @@ export async function runPrivateRestartCanary(pool,phase,{deploymentId=process.e
  }
  if(phase==='cleanup'){
   return tx(pool,async client=>{
+   // Cleanup is idempotent, but must never erase a foreign UUID collision.
+   assertCanaryOwnership(await countCanary(client));
    await purgeCanary(client);
    // A successful DELETE command is not proof that rows were removed.
    // Verify both private records are absent before committing cleanup.
