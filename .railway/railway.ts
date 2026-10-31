@@ -13,7 +13,8 @@ export default defineRailway(() => {
   const bar = service("moltbeer-free-bar-api", {
     // The source GitHub repo and existing single-region/sleep policy
     // remain managed by the existing Railway service during migration.
-    // Match railway.json: build-time tests must never inherit live durable mode.\n    build: "MOLTBEER_STORAGE_MODE=ephemeral npm test",
+    // Match railway.json: build-time tests must never inherit live durable mode.
+    build: "MOLTBEER_STORAGE_MODE=ephemeral npm test",
     start: "npm start",
     healthcheck: "/health",
     healthcheckTimeout: 60,
