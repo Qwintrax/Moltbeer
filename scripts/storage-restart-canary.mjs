@@ -65,8 +65,14 @@ export async function runPrivateRestartCanary(pool,phase,{deploymentId=process.e
   });
  }
  if(phase==='cleanup'){
-  await tx(pool,async client=>{await purgeCanary(client)});
-  return {phase:'cleanup',passed:true};
+  return tx(pool,async client=>{
+   await purgeCanary(client);
+   // A successful DELETE command is not proof that rows were removed.
+   // Verify both private records are absent before committing cleanup.
+   const remains=await countCanary(client);
+   if(remains.session||remains.message)throw Error('Private canary cleanup failed');
+   return {phase:'cleanup',passed:true};
+  });
  }
  // Keep verification and deletion atomic. On failure, roll back and retain the
  // evidence for diagnosis; an explicit cleanup mode can remove it afterwards.
