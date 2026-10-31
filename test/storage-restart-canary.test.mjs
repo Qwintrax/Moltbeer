@@ -142,3 +142,24 @@ test('cleanup must verify both rows are gone before committing',async()=>{
  assert.equal(pool.state.sessions.size,0);
  assert.equal(pool.state.messages.size,0);
 });
+
+test('cleanup refuses a foreign session occupying the fixed diagnostic UUID',async()=>{
+ const pool=memoryDatabase();
+ const sessionId='b237bf95-c9df-45b8-91cb-7c1fe4e51f26';
+ pool.state.sessions.set(sessionId,{name:'RealVisitor'});
+ await assert.rejects(runPrivateRestartCanary(pool,'cleanup'),/Private restart canary failed/);
+ assert.equal(pool.state.sessions.get(sessionId).name,'RealVisitor');
+ assert.equal(pool.state.commits,0,'foreign session must not be deleted');
+});
+
+test('cleanup refuses altered message evidence instead of deleting it',async()=>{
+ const pool=memoryDatabase();
+ const messageId='7cdd1b81-7955-4caf-a575-c4d18e923dbf';
+ await runPrivateRestartCanary(pool,'seed',{deploymentId:SEED_ID});
+ const original=pool.state.messages.get(messageId);
+ pool.state.messages.set(messageId,{...original,content:'Unrelated private message'});
+ await assert.rejects(runPrivateRestartCanary(pool,'cleanup'),/Private restart canary failed/);
+ assert.equal(pool.state.messages.get(messageId).content,'Unrelated private message');
+ assert.equal(pool.state.sessions.size,1);
+ assert.equal(pool.state.commits,1,'failed cleanup must roll back');
+});
