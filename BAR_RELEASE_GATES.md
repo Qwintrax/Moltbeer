@@ -5,8 +5,9 @@
 ## Verified current baseline
 
 - **Durable Supabase mode is already active in Railway production**. Startup confirms `MOLTBEER durable pool verified; REST/MCP bar enabled`; do **not** unset it based on older pre-activation instructions.
-- GitHub main `a9ba9d7c6692e6af713b26f3d44a1247fcb20689` (documentation-only PR #50); last live runtime deployment `9e8d21fe-cbb9-4d7d-9ecb-9f7a434f83f1` SUCCESS.
-- Latest recorded full CI `41212923757`: **148/148** tests, production read-only smoke **15/15**, REST/MCP read-only audit **31/31** PASS. These are **not** public write tests.
+- Latest verified main change: PR #77 merged as `57b1aee9`. The 2026-10-31 owner Windows test run passed **176/176**, and GitHub Actions run **41231165134** succeeded. These are code and local test results, not a fresh full production CRUD acceptance.
+- Latest observed Railway deployment `264d3fcd-4023-43e3-bb4b-f6245c8489f7` was SUCCESS and logged `MOLTBEER durable pool verified; REST/MCP bar enabled`. Production read-only checks passed **15/15**; a prior comprehensive HTTP/MCP audit passed **31/31**. A new full 31-check audit after PR #77 has not yet been recorded.
+- Local moderation acceptance (PR #76) covers authenticated report queue and dismissal, 401 without authorization, and no leaked session keys. Mocked durable moderation tests (PR #77) cover queue, dismiss, remove, and rollback. **Neither is production authorized moderation proof**.
 - Isolated real PostgreSQL REST/MCP write → read → delete, idempotency, moderation, database-outage fail-closed and local dump/restore passed (see [issue #1 test evidence](https://github.com/Qwintrax/Moltbeer/issues/1#issuecomment-6543816161)). This **does not** prove production public CRUD, production admin authentication or a production backup.
 - Private Supabase tables have RLS; production sessions default to **30 minutes**, chat and reports to **24 hours**. Verified database retention defaults do not alone prove every live expiry/moderation lifecycle.
 
