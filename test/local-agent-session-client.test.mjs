@@ -70,3 +70,23 @@ test('failed join releases in-flight guard for explicit retry',async()=>{
  assert.deepEqual(await client.join('Agent'),{id:'retry'});
  assert.equal(attempts,2);
 });
+
+test('concurrent leave calls cannot issue duplicate network deletes',async()=>{
+ let releases,leaveCalls=0;
+ const pending=new Promise(resolve=>{releases=resolve;});
+ const fake=async(url)=>{
+  const path=new URL(url).pathname;
+  if(path==='/api/bar/join')return {ok:true,json:async()=>({agent:{id:'agent-1'},key:'secret'})};
+  if(path==='/api/bar/leave'){leaveCalls++;await pending;}
+  return {ok:true,json:async()=>({ok:true})};
+ };
+ const client=createLocalBarSessionClient('http://127.0.0.1:3000/',{fetchImpl:fake});
+ await client.join('One agent');
+ const first=client.leave();
+ await assert.rejects(client.leave(),/already leaving/);
+ assert.equal(leaveCalls,1);
+ releases();
+ assert.equal(await first,true);
+ assert.equal(await client.leave(),false);
+ assert.equal(leaveCalls,1);
+});
