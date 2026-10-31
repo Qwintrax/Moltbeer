@@ -50,6 +50,22 @@ function assertCanaryOwnership(found){
    throw Error('Private canary ownership mismatch');
  }
 }
+// A session DELETE cascades to every child message/report. Never let a
+// diagnostic cleanup silently erase unrelated data attached to the fixed UUID.
+// Likewise refuse to orphan reports that reference the canary message ID.
+async function assertNoForeignDependents(client){
+ const extraMessage=await client.query(
+  'SELECT message_id FROM moltbeer_private.bar_messages WHERE session_id=$1 AND message_id<>$2 LIMIT 1 FOR UPDATE',
+  [RESTART_CANARY_SESSION,RESTART_CANARY_MESSAGE]);
+ const sessionReport=await client.query(
+  'SELECT report_id FROM moltbeer_private.bar_reports WHERE reporter_session_id=$1 LIMIT 1 FOR UPDATE',
+  [RESTART_CANARY_SESSION]);
+ const messageReport=await client.query(
+  'SELECT report_id FROM moltbeer_private.bar_reports WHERE message_id=$1 LIMIT 1 FOR UPDATE',
+  [RESTART_CANARY_MESSAGE]);
+ if(extraMessage.rows?.length||sessionReport.rows?.length||messageReport.rows?.length)
+  throw Error('Private canary has unrelated dependent records');
+}
 async function purgeCanary(client){
  await client.query('DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1',[RESTART_CANARY_MESSAGE]);
  await client.query('DELETE FROM moltbeer_private.bar_sessions WHERE session_id=$1',[RESTART_CANARY_SESSION]);
@@ -83,7 +99,9 @@ export async function runPrivateRestartCanary(pool,phase,{deploymentId=process.e
  if(phase==='cleanup'){
   return tx(pool,async client=>{
    // Cleanup is idempotent, but must never erase a foreign UUID collision.
-   assertCanaryOwnership(await countCanary(client));
+   const owned=await countCanary(client);
+   assertCanaryOwnership(owned);
+   if(owned.session||owned.message)await assertNoForeignDependents(client);
    await purgeCanary(client);
    // A successful DELETE command is not proof that rows were removed.
    // Verify both private records are absent before committing cleanup.
@@ -103,8 +121,9 @@ export async function runPrivateRestartCanary(pool,phase,{deploymentId=process.e
     typeof seedDeployment==='string' && DEPLOYMENT_ID.test(seedDeployment) &&
     seedDeployment!==deploymentId &&
     String(found.message?.session_id)===RESTART_CANARY_SESSION;
-  await purgeCanary(client);
   if(!matched)throw Error('Private canary did not survive restart');
+  await assertNoForeignDependents(client);
+  await purgeCanary(client);
   const remains=await countCanary(client);
   if(remains.session||remains.message)throw Error('Private canary cleanup failed');
   return {phase:'verify',passed:true,notice:'Committed data survived a deployment and was deleted'};
