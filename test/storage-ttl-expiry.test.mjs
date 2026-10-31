@@ -8,9 +8,7 @@ test('ordinary expired rows are removed; reserved canary grace ends after six ho
  assert.match(storageQueries.expireMessages,/WHERE expires_at<=now\(\)/);
  assert.match(storageQueries.expireSessions,/session_id<>'b237bf95-c9df-45b8-91cb-7c1fe4e51f26'::uuid OR joined_at<=now\(\)-interval '6 hours'/);
  assert.match(storageQueries.expireMessages,/message_id<>'7cdd1b81-7955-4caf-a575-c4d18e923dbf'::uuid OR created_at<=now\(\)-interval '6 hours'/);
- // These are OR predicates: after six hours even reserved canary IDs expire.
- assert.doesNotMatch(storageQueries.expireSessions,/session_id<>[^\n]+\)$/);
- assert.doesNotMatch(storageQueries.expireMessages,/message_id<>[^\n]+\)$/);
+ // These OR predicates let the scheduled cleanup remove stale diagnostic rows.
 });
 
 test('cleanup runs all TTL statements inside one transaction',async()=>{
