@@ -1,26 +1,35 @@
-# Railway migration safety gate — MOLTBEER
+# Railway IaC migration safety gate — MOLTBEER
 
-Prepared **2026-10-30** after reading current [Railway Infrastructure as Code reference](https://docs.railway.com/infrastructure-as-code/reference) and the [Config as Code deprecation notice](https://docs.railway.com/config-as-code). The old `railway.json` remains live until *2026-12-01*; it must be migrated before that date.
+Updated **2026-10-31** from the live Railway service configuration and [Railway's IaC migration guide](https://docs.railway.com/infrastructure-as-code#migrating-from-config-as-code). **This is a preparation document, not proof of migration.** Railway's Config as Code transition deadline is **2026-12-01**.
 
-## Existing verified Railway state
-- Project **Moltbeer**, service `moltbeer-free-bar-api`, branch `Qwintrax/Moltbeer:main`, single instance in region `sfo`.
-- `npm test` build gate, `npm start`, GET `/health` health check.
-- `sleepApplication: true`; **no volume or bucket**; live domain remains `moltbeer-free-bar-api-production.up.railway.app`.
-- Railway lists a private `DATABASE_URL` variable, but no deployed Supabase adapter or verified database roundtrip; `MOLTBEER_ADMIN_TOKEN` is not configured. Never fake connection/persistence.
+## Verified production baseline (2026-10-31)
 
-## Candidate code
-`.railway/railway.ts` is now committed as an **unapplied candidate**, with `export const partial = "moltbeer-free-bar-api"` following Railway's single-service per-repo guidance. Naming an existing service does **not** prove that IaC will adopt its current resource ID. It declares `npm test`, `npm start` and `/health` without requesting a new database, volume, additional replica, subscription or GPU.
+- Existing Railway project `Moltbeer`, environment `production`, service `moltbeer-free-bar-api`; source `Qwintrax/Moltbeer` branch `main`.
+- Live service: **one replica in `sfo`**, Railpack builder, V2 runtime, `npm start`, health check `/health`, `sleepApplication: true`. No attached volume, bucket, or pending configuration changes.
+- Existing public domain: `moltbeer-free-bar-api-production.up.railway.app`.
+- The service already has the **variable names** `DATABASE_URL`, `MOLTBEER_ADMIN_TOKEN`, `MOLTBEER_STORAGE_MODE`, `MOLTBEER_STORAGE_PREFLIGHT`, `MOLTBEER_STORAGE_ACCEPTANCE` and `MOLTBEER_RESTART_CANARY_PHASE`. Their secret values must not be printed, copied to GitHub or replaced during migration.
+- **Supabase durable mode is live**, with startup log `MOLTBEER durable pool verified; REST/MCP bar enabled`. Independent read-only production REST/MCP tests have passed. These do **not** prove an isolated public production write/delete cycle or a production backup.
+- Last checked active Railway deployment `9e8d21fe-cbb9-4d7d-9ecb-9f7a434f83f1` was SUCCESS. Later candidate-only commit `9e18382e` was SKIPPED by Railway (no live runtime change).
 
-**Not yet verified:** Railway CLI IaC plan and whether the candidate would inadvertently modify existing regional deployment, sleep policy, GitHub source binding or resource ownership. **Do not run `railway config apply` until the plan is inspected and reports no unintended changes.**
+## Current source files and known differences
 
-## Required validation
-1. Use Railway CLI from a securely linked, authorized Railway workspace (do not print tokens): `railway config --help`, then **`railway config migrate --service moltbeer-free-bar-api` without `--apply`** to preview the official generated candidate. Compare it with the committed hand-written file. This is the documented migration route for an existing single-service `railway.json` repository.
-2. Preserve existing service identifiers, source and current `sleepApplication` setting. Compare `railway config pull` output with the official `migrate` preview; **do not run `migrate --apply` until resource ownership and exact plan are understood**. No new services or volumes.
-3. Run **`railway config plan`**, inspect exact intended changes. Reject any chargeable resource, region, replica, domain, sleep, secret, source or service replacement.
-4. Only on a harmless zero-cost plan: `railway config apply` with owner-authorized existing workspace; verify `npm test` passes, healthcheck, domain, no new variables/volumes and actual account cost guard.
-5. Once applied and independently tested, delete deprecated `railway.json` and keep build/health gates under IaC. Repeat plan and verify no deleted service.
-6. Do not mark TODO #9 completely done before step 5. The file currently only prepares the migration.
+- `railway.json` is still the existing Config as Code file. It specifies `MOLTBEER_STORAGE_MODE=ephemeral npm test` for the build, `npm start`, `/health`, 60-second health-check timeout, **autosleep**, **restart on failure (three retries)**, and **watch patterns**.
+- `.railway/railway.ts` is an **unapplied candidate** with named partial `moltbeer-free-bar-api`. It specifies the ephemeral-only test build, start command and health check. **It does not explicitly encode autosleep, restart policy, watch patterns, the GitHub source binding, region/replica or domain.** Do not assume these settings are preserved or deleted: verify their actual behavior in the authenticated plan.
+- `package.json` currently does **not** declare the `railway` IaC SDK dependency. Railway's [CLI documentation](https://docs.railway.com/cli/config) says the SDK must be installed before `config plan` or `config apply`. Validate in a disposable worktree first; avoid changing production dependencies without a reviewed PR.
+- As of this check, the Railway CLI on the owner's Windows computer can run, but **`whoami` was Unauthorized**. A production plan/cutover is **not** verified. Do not substitute the connected read-only Railway API for CLI authorization.
 
-Source docs: https://docs.railway.com/infrastructure-as-code · https://docs.railway.com/cli · https://docs.railway.com/config-as-code
+## Safe validation and migration — NOT YET PERFORMED
 
-**Docs checked 2026-10-30:** Railway's [official migration instructions](https://docs.railway.com/infrastructure-as-code#migrating-per-repo-config-as-code) specify `railway config migrate` for per-repo `railway.json` and a named `partial` for single-service repositories. No CLI plan was executed in this pass, and no Railway settings were changed.
+1. Authenticate the Railway CLI securely using its interactive login and link to the **existing** project and production environment. Never paste API tokens into shell commands, logs, GitHub issues, or chat.
+2. In a disposable checkout, use `railway config --help` and `railway config migrate --service moltbeer-free-bar-api` **without `--apply`** to preview the official migration output. Compare with the committed candidate and the existing `railway.json`; do not overwrite the candidate blindly.
+3. Install the IaC SDK in that disposable checkout if needed, without modifying the production branch. Compare `railway config pull` output with the actual live configuration. **Never** use `--include-variables`, `--show-values` or `--decrypt-variables` in logged commands.
+4. Railway's documentation says a service cannot be managed by both `railway.json` and IaC at once. Follow the official `railway config migrate --apply` workflow **only after reviewing the generated file and ownership**, because this writes IaC and clears Railway Config File settings. Do not delete `railway.json` until ownership and preservation of every live setting are established.
+5. Run `railway config plan` (read-only) and inspect the complete diff. **Stop** on any new/deleted/replaced service, extra paid resource, changed region/replicas, autosleep, restart behavior, source, domain, secrets or unexplained setting. The migration should preserve the existing service ID.
+6. Only after a reviewed, owner-authorized, harmless plan, apply the intended change. Recheck the existing domain, health, REST/MCP read-only smoke, GitHub CI, durable startup, instance count, variable **names**, deployment, error rate and costs. If a migration requires changing runtime behavior, open a separate minimal PR and retest.
+7. Remove deprecated `railway.json` only after successful cutover and verification. Document plan/commit/deploy IDs in [issue #1](https://github.com/Qwintrax/Moltbeer/issues/1). **Do not close release gate #6** without those results.
+
+## Release guardrails
+
+No new paid services, database, volume, bucket, GPU, or extra replica. No production database writes or fake agents for this migration. Never expose secret values. A candidate file or green CI is **not** a completed migration.
+
+Official references: [Railway Config CLI](https://docs.railway.com/cli/config), [IaC migration](https://docs.railway.com/infrastructure-as-code#migrating-from-config-as-code), [IaC reference](https://docs.railway.com/infrastructure-as-code/reference).
