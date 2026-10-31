@@ -104,3 +104,37 @@ test('MCP durable bar_say never downgrades to unverified guest when its key is m
   assert.equal(result.ok,undefined);
  }
 });
+
+test('durable public REST and MCP refuse mutations when database configuration is unavailable',async()=>{
+ const oldMode=process.env.MOLTBEER_STORAGE_MODE;
+ const oldDatabaseUrl=process.env.DATABASE_URL;
+ try{
+  process.env.MOLTBEER_STORAGE_MODE='durable';
+  delete process.env.DATABASE_URL;
+  const {fetchApp}=await import('../server.mjs');
+  const origin='http://localhost:3000';
+  for(const path of ['/health','/api/bar','/api/bar/agents','/api/stats']){
+   const response=await fetchApp(new Request(origin+path));
+   assert.equal(response.status,503,`${path} must not return ephemeral data in durable mode`);
+  }
+  const join=await fetchApp(new Request(origin+'/api/bar/join',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({name:'isolated-local-probe'})
+  }));
+  assert.equal(join.status,503,'REST join must not claim a persisted visitor');
+  const mcp=await fetchApp(new Request(origin+'/mcp',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',
+    params:{name:'moltbeer_bar_join',arguments:{name:'isolated-local-probe'}}})
+  }));
+  assert.equal(mcp.status,200,'MCP tool errors use the JSON-RPC result envelope');
+  const result=await mcp.json();
+  assert.equal(result.result?.isError,true,'MCP join must be marked as failed');
+  assert.doesNotMatch(JSON.stringify(result),/postgresql:\/\/|DATABASE_URL|private-password/i);
+ }finally{
+  if(oldMode===undefined)delete process.env.MOLTBEER_STORAGE_MODE;
+  else process.env.MOLTBEER_STORAGE_MODE=oldMode;
+  if(oldDatabaseUrl===undefined)delete process.env.DATABASE_URL;
+  else process.env.DATABASE_URL=oldDatabaseUrl;
+ }
+});
