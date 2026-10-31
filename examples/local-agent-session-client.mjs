@@ -31,6 +31,7 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
   async move(room,spot='stool'){return post('/api/bar/move',{...credentials(),room,spot});},
   async say(message){return post('/api/bar',{...credentials(),message});},
   async leave(){
+   if(joining)throw Error('Agent is joining; wait before leaving');
    if(leaving)throw Error('Agent already leaving');
    if(!session)return false;
    leaving=true;
