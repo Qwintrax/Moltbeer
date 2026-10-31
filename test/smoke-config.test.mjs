@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 
-const script = new URL("../scripts/smoke-readonly.mjs",import.meta.url).pathname;
+const script = fileURLToPath(new URL("../scripts/smoke-readonly.mjs",import.meta.url));
 function check(mode) {
   return spawnSync(process.execPath,[script],{
     env:{...process.env,MOLTBEER_BASE_URL:"",MOLTBEER_EXPECTED_PERSISTENCE:mode},
@@ -22,3 +23,4 @@ test("read-only smoke accepts both known modes but requires an approved HTTPS or
     assert.doesNotMatch(result.stderr,/must be ephemeral or durable/);
   }
 });
+
