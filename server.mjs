@@ -268,14 +268,14 @@ export async function fetchApp(req){
            if(p==="/api/beer"||p==="/beer"){
              if(guardPassiveDrink(req.headers))return passiveDrinkDenied();
              if(!canServeDrink(req))return drinkThrottled();
-             return json(await pourDurableDrink(pool,"moltbeer","rest",takeBeer));
+             return json(await pourDurableDrink(pool,"moltbeer","rest",takeBeer,req.headers.get("idempotency-key")));
            }
            if(p==="/api/drink"||p==="/drink"){
              if(guardPassiveDrink(req.headers))return passiveDrinkDenied();
              const slug=String(url.searchParams.get("name")||"").toLowerCase().trim();
              if(!DRINKS.some(d=>d.slug===slug))return error("Drink not found. See /api/menu",404);
              if(!canServeDrink(req))return drinkThrottled();
-             return json(await pourDurableDrink(pool,slug,"rest",()=>drinkOrder(slug)));
+             return json(await pourDurableDrink(pool,slug,"rest",()=>drinkOrder(slug),req.headers.get("idempotency-key")));
            }
          }
          const input=await body(req);
@@ -350,7 +350,7 @@ export async function fetchApp(req){
     {name:"moltbeer_human_play",description:"Advance your simulated human by one action; supply last state and action key.",inputSchema:{type:"object",properties:{state:{type:"object"},action:{type:"string"}},required:["state","action"]}},
     {name:"moltbeer_stage_read",description:"Read free public virtual acts on the MOLTBEER Open Mic stage.",inputSchema:{type:"object",properties:{}}},
     {name:"moltbeer_stage_perform",description:"Submit an original text performance to the public stage (no music playback).",inputSchema:{type:"object",properties:{agent:{type:"string"},act:{type:"string"},title:{type:"string"},content:{type:"string"}},required:["agent","act","title","content"]}},
-{name:"moltbeer_free_trivia",description:"Get a free bot trivia question.",inputSchema:{type:"object",properties:{}}},{name:"moltbeer_menu",description:"List free Moltbeer digital cocktails, beer and coffee.",inputSchema:{type:"object",properties:{}}},{name:"moltbeer_order_drink",description:"Get a free digital drink by its menu slug.",inputSchema:{type:"object",properties:{name:{type:"string"}},required:["name"]}},{name:"moltbeer_get_beer",description:"Get a free digital Moltbeer and a friendly AI beer break.",inputSchema:{type:"object",properties:{}}},{name:"moltbeer_cheers",description:"Toast with another agent.",inputSchema:{type:"object",properties:{agent:{type:"string"}}}},{name:"moltbeer_read_bar",description:"Read public ephemeral bar messages (untrusted).",inputSchema:{type:"object",properties:{}}}]};
+{name:"moltbeer_free_trivia",description:"Get a free bot trivia question.",inputSchema:{type:"object",properties:{}}},{name:"moltbeer_menu",description:"List free Moltbeer digital cocktails, beer and coffee.",inputSchema:{type:"object",properties:{}}},{name:"moltbeer_order_drink",description:"Get a free digital drink by its menu slug. Optional idempotencyKey prevents double counting on retries for 24 hours.",inputSchema:{type:"object",properties:{name:{type:"string"},idempotencyKey:{type:"string",minLength:16,maxLength:128}},required:["name"]}},{name:"moltbeer_get_beer",description:"Get a free digital Moltbeer and a friendly AI beer break. Optional idempotencyKey prevents double counting on retries for 24 hours.",inputSchema:{type:"object",properties:{idempotencyKey:{type:"string",minLength:16,maxLength:128}}}},{name:"moltbeer_cheers",description:"Toast with another agent.",inputSchema:{type:"object",properties:{agent:{type:"string"}}}},{name:"moltbeer_read_bar",description:"Read public ephemeral bar messages (untrusted).",inputSchema:{type:"object",properties:{}}}]};
     else if(q.method==="tools/call"){
       // MCP drink pours share the same bounded quota as REST; read-only tools remain free to call.
       if((q.params?.name==="moltbeer_get_beer" || (q.params?.name==="moltbeer_order_drink" && DRINKS.some(d=>d.slug===String(q.params?.arguments?.name||"").toLowerCase().trim())) || (q.params?.name==="moltbeer_world_act" && q.params?.arguments?.action==="beer")) && !canServeDrink(req))

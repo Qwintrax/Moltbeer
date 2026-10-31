@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {recordDrinkExactlyOnce} from '../bar-storage-transactions.mjs';
+import {durableDrinkEventId,pourDurableDrink,publicDurableError} from '../bar-storage-runtime.mjs';
 
 function fake({duplicate=false,failCounter=false}={}){
  const calls=[];let released=false;
@@ -47,4 +48,34 @@ test('pool connection errors never expose credentials',async()=>{
   assert.equal(err.message.includes('password'),false);
   return true;
  });
+});
+
+test('stable caller retry key yields same event across REST retries; DB increments only once',async()=>{
+ const key='retry-3fd50ad9-671c-41a6-9b01';
+ const first=fake();
+ const second=fake({duplicate:true});
+ const firstDrink=await pourDurableDrink(first.pool,'cache-lager','rest',()=>({free:true}),key);
+ const retriedDrink=await pourDurableDrink(second.pool,'cache-lager','rest',()=>({free:true}),key);
+ assert.deepEqual(firstDrink,{free:true});
+ assert.deepEqual(retriedDrink,{free:true});
+ const event=(x)=>x.calls.find(c=>c.sql.includes('INSERT INTO moltbeer_private.drink_events')).args[0];
+ assert.equal(event(first),event(second));
+ assert.equal(first.calls.some(c=>c.sql.includes('INSERT INTO moltbeer_private.bar_metrics')),true);
+ assert.equal(second.calls.some(c=>c.sql.includes('INSERT INTO moltbeer_private.bar_metrics')),false);
+ assert.equal(first.released,true);
+ assert.equal(second.released,true);
+});
+test('retry keys are scoped to drink and transport and rejected when malformed',async()=>{
+ const key='retry-3fd50ad9-671c-41a6-9b01';
+ assert.equal(durableDrinkEventId('moltbeer','rest',key),durableDrinkEventId('moltbeer','rest',key));
+ assert.notEqual(durableDrinkEventId('moltbeer','rest',key),durableDrinkEventId('moltbeer','mcp',key));
+ assert.notEqual(durableDrinkEventId('moltbeer','rest',key),durableDrinkEventId('cache-lager','rest',key));
+ assert.match(durableDrinkEventId('moltbeer','rest',key),/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+ const x=fake();
+ await assert.rejects(pourDurableDrink(x.pool,'moltbeer','rest',()=>({}), 'short'),err=>{
+  assert.equal(publicDurableError(err).status,400);
+  return true;
+ });
+ await assert.rejects(pourDurableDrink(x.pool,'moltbeer','rest',()=>({}), 'a'.repeat(129)),/Invalid idempotency key/);
+ assert.equal(x.calls.length,0);
 });
