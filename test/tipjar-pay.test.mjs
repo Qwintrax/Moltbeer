@@ -82,13 +82,18 @@ test("offline QR SVG matches the amount-free payment request and requires no thi
   assert.equal(TIPJAR_QR_PAY_URI, (await (await req("/api/tipjar")).json()).paymentUrl);
 });
 
-test("Counter has compact manual wallet + QR options and still no beer icon",()=>{
+test("Counter exposes exactly Copy wallet while APIs retain read-only payment details",()=>{
   const html=renderPage("/bar-room");
-  assert.match(html,/href="solana:Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z\?/);
-  assert.match(html,/href="\/api\/tipjar\/qr\.svg"/);
-  assert.match(html,/Open wallet/);
-  assert.match(html,/QR code/);
-  assert.match(html,/id="counter-tip-jar"/);
+  const start=html.indexOf('<div id="counter-tip-jar"');
+  const end=html.indexOf('<p id="bar-scene-summary"',start);
+  assert.ok(start>=0&&end>start);
+  const panel=html.slice(start,end);
+  assert.match(panel,/id="counter-tip-copy"/);
+  assert.match(panel,/Copy wallet/);
+  assert.match(panel,/counter-tip-wallet/);
+  assert.match(panel,/No tab\. No pressure\. Just good vibes\./);
+  assert.equal((panel.match(/<button\b/g)||[]).length,1);
+  assert.doesNotMatch(panel,/<a\b|Open wallet|QR code|Solscan/);
+  assert.doesNotMatch(panel,/counter-tip-icon/);
   assert.match(html,/counterJar.hidden=select.value!=="counter"/);
-  assert.doesNotMatch(html,/counter-tip-icon/);
 });
