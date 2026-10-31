@@ -79,3 +79,15 @@ test('retry keys are scoped to drink and transport and rejected when malformed',
  await assert.rejects(pourDurableDrink(x.pool,'moltbeer','rest',()=>({}), 'a'.repeat(129)),/Invalid idempotency key/);
  assert.equal(x.calls.length,0);
 });
+
+test('database connection failure rejects before any drink is produced or recorded',async()=>{
+ let produced=0;
+ const pool={connect:async()=>{throw Error('postgresql://secret:password@private-host')}};
+ await assert.rejects(pourDurableDrink(pool,'moltbeer','rest',()=>{produced++;return {free:true}},'retry-connection-failure-12345'),err=>{
+  assert.equal(err.message,'Durable drink transaction failed');
+  assert.equal(publicDurableError(err).status,503);
+  assert.doesNotMatch(err.message,/password|private-host/);
+  return true;
+ });
+ assert.equal(produced,0);
+});
