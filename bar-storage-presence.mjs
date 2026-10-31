@@ -83,9 +83,11 @@ export async function heartbeatDurableBar(pool,{id,key}={}){
 export async function leaveDurableBar(pool,{id,key}={}){
  return transaction(pool,async client=>{
   await verified(client,{id,key});
-  // Reports reference message IDs as text, not FK: erase reports about this
-  // session's signed messages before the session's message cascade runs.
-  await client.query(`DELETE FROM moltbeer_private.bar_reports WHERE message_id IN
+  // Explicitly erase reports filed BY this session and reports ABOUT its
+  // signed messages before session deletion. The reporter FK also cascades,
+  // but explicit deletion keeps the privacy guarantee independent of that FK.
+  await client.query(`DELETE FROM moltbeer_private.bar_reports
+    WHERE reporter_session_id=$1 OR message_id IN
     (SELECT message_id::text FROM moltbeer_private.bar_messages WHERE session_id=$1)`,[id]);
   const result=await client.query(storageQueries.eraseSession,[id]);
   if(result.rowCount!==1)invalidIdentity();
