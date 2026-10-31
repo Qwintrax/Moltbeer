@@ -128,7 +128,7 @@ test('pending leave blocks heartbeat, move and chat until completion',async()=>{
  await assert.rejects(client.heartbeat(),/leaving/);
  await assert.rejects(client.move('lounge'),/leaving/);
  await assert.rejects(client.say('hello'),/leaving/);
- assert.equal(actions,1,'only join may reach the network before leave completes');
+ assert.equal(actions,0,'no heartbeat, move or chat may reach the network during leave');
  resolveLeave();
  assert.equal(await leaving,true);
  assert.equal(client.joined,false);
