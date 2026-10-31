@@ -6,6 +6,7 @@ import { TIPJAR_QR_PAY_URI, tipJarQrSvg } from "../tipjar-qr.mjs";
 
 const BASE = "http://localhost";
 const WALLET = "Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z";
+const BASE_WALLET = "0xf1c2581CBEdF9020B6269eefAaB1Dc4F1e9261F2";
 const req=(path,options)=>fetchApp(new Request(BASE+path,options));
 const mcp=async (id,method,params={})=> {
   const response=await req("/mcp",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id,method,params})});
@@ -96,4 +97,70 @@ test("Counter exposes exactly Copy wallet while APIs retain read-only payment de
   assert.doesNotMatch(panel,/<a\b|Open wallet|QR code|Solscan/);
   assert.doesNotMatch(panel,/counter-tip-icon/);
   assert.match(html,/counterJar.hidden=select.value!=="counter"/);
+});
+
+test("Tip Jar exposes Base mainnet recipient without changing default Solana behavior",async()=>{
+  const defaultValue=await (await req("/api/tipjar")).json();
+  assert.equal(defaultValue.network,"solana");
+  assert.equal(defaultValue.address,WALLET);
+  assert.deepEqual(defaultValue.networks.map(n=>n.network),["solana","base"]);
+  assert.deepEqual(defaultValue.networks.map(n=>n.address),[WALLET,BASE_WALLET]);
+  const result=await req("/api/tipjar?network=base");
+  assert.equal(result.status,200);
+  const base=await result.json();
+  assert.equal(base.network,"base");
+  assert.equal(base.chainId,8453);
+  assert.equal(base.address,BASE_WALLET);
+  assert.equal(base.accepted,"ETH");
+  assert.equal(base.autoTip,false);
+  assert.equal(base.walletApprovalRequired,true);
+  assert.equal(base.paymentUrl,null,"A Solana Pay request must never be used on Base");
+  assert.equal(base.usdc,"not confirmed");
+  assert.match(base.note,/Base mainnet/);
+  assert.match(base.note,/No signing, automatic transfer/);
+  const solExplicit=await (await req("/api/tipjar?network=solana")).json();
+  assert.equal(solExplicit.paymentUrl,TIPJAR_QR_PAY_URI);
+});
+
+test("Tip Jar rejects unsupported networks and Base amount-to-URI requests",async()=>{
+  for(const value of ["","ethereum","polygon","arbitrum","Base","0x","solana,base"]){
+    const response=await req("/api/tipjar?network="+encodeURIComponent(value));
+    assert.equal(response.status,400,value);
+    assert.match((await response.json()).error,/Invalid network/);
+  }
+  const invalid=await req("/api/tipjar?network=base&amount=0.01");
+  assert.equal(invalid.status,400);
+  assert.match((await invalid.json()).error,/supported only for Solana/);
+});
+
+test("MCP Tip Jar reports confirmed Base chain, rejects unconfirmed chains",async()=>{
+  const list=await mcp(20,"tools/list");
+  const tip=list.data.result.tools.find(x=>x.name==="moltbeer_get_tipjar");
+  assert.deepEqual(tip.inputSchema.properties.network.enum,["solana","base"]);
+  const value=await mcp(21,"tools/call",{name:"moltbeer_get_tipjar",arguments:{network:"base"}});
+  assert.equal(value.http,200);
+  assert.equal(value.data.result.isError,false);
+  const result=JSON.parse(value.data.result.content[0].text);
+  assert.equal(result.address,BASE_WALLET);
+  assert.equal(result.chainId,8453);
+  assert.equal(result.paymentUrl,null);
+  const denied=await mcp(22,"tools/call",{name:"moltbeer_get_tipjar",arguments:{network:"ethereum"}});
+  assert.equal(denied.data.result.isError,true);
+  assert.match(denied.data.result.content[0].text,/Invalid network/);
+  const amount=await mcp(23,"tools/call",{name:"moltbeer_get_tipjar",arguments:{network:"base",amount:"0.01"}});
+  assert.equal(amount.data.result.isError,true);
+});
+
+test("Counter offers a compact Solana/Base network selector and still only Copy wallet",()=>{
+  const html=renderPage("/bar-room");
+  const start=html.indexOf('<div id="counter-tip-jar"'),end=html.indexOf('<p id="bar-scene-summary"',start);
+  const panel=html.slice(start,end);
+  assert.match(panel,/<select id="counter-tip-network"/);
+  assert.match(panel,/value="solana">Solana · SOL/);
+  assert.match(panel,/value="base">Base · ETH/);
+  assert.match(html,/tipAddresses=\{solana:"Ad2nYECAfGKp6MtK1ST9D3w1kApBdQwTZkw6cRbHys5Z",base:"0xf1c2581CBEdF9020B6269eefAaB1Dc4F1e9261F2"\}/);
+  assert.match(html,/navigator.clipboard.writeText\(tipAddress.textContent\)/);
+  assert.equal((panel.match(/<button\b/g)||[]).length,1);
+  assert.doesNotMatch(panel,/<a\b|Open wallet|QR code|Solscan/);
+  assert.doesNotMatch(html,/counter-tip-icon/);
 });
