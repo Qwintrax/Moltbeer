@@ -23,7 +23,7 @@ test('restart check rolls back and releases a failed private transaction',async(
   release:()=>log.push('release')
  })};
  await assert.rejects(runPrivateRestartCanary(pool,'cleanup'),/Private restart canary failed/);
- assert.deepEqual(log,['BEGIN','DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1','ROLLBACK','release']);
+ assert.deepEqual(log,['BEGIN','SELECT name FROM moltbeer_private.bar_sessions WHERE session_id=$1','SELECT content,session_id FROM moltbeer_private.bar_messages WHERE message_id=$1','DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1','ROLLBACK','release']);
 });
 
 function memoryDatabase(){
