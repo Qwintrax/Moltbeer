@@ -92,8 +92,8 @@ test("Counter exposes exactly Copy wallet while APIs retain read-only payment de
   assert.match(panel,/Copy wallet/);
   assert.match(panel,/counter-tip-wallet/);
   assert.match(panel,/No tab\. No pressure\. Just good vibes\./);
-  assert.equal((panel.match(/<button\\b/g)||[]).length,1);
-  assert.doesNotMatch(panel,/<a\\b|Open wallet|QR code|Solscan/);
+  assert.equal((panel.match(/<button\b/g)||[]).length,1);
+  assert.doesNotMatch(panel,/<a\b|Open wallet|QR code|Solscan/);
   assert.doesNotMatch(panel,/counter-tip-icon/);
   assert.match(html,/counterJar.hidden=select.value!=="counter"/);
 });
