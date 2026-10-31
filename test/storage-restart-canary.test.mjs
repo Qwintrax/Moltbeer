@@ -232,3 +232,30 @@ test('all canary ownership reads lock both rows before verify or cleanup',async(
  assert.equal(pool.state.sessions.size,0);
  assert.equal(pool.state.messages.size,0);
 });
+
+// The production bar remains durable while the owner-only private canary runs.
+test('private canary seed/verify works while durable public routes are enabled',async()=>{
+ const previous=process.env.MOLTBEER_STORAGE_MODE;
+ process.env.MOLTBEER_STORAGE_MODE='durable';
+ try{
+  const pool=memoryDatabase();
+  const seeded=await runPrivateRestartCanary(pool,'seed',{deploymentId:SEED_ID});
+  assert.equal(seeded.passed,true);
+  assert.equal(pool.state.sessions.size,1);
+  const verified=await runPrivateRestartCanary(pool,'verify',{deploymentId:VERIFY_ID});
+  assert.equal(verified.passed,true);
+  assert.equal(pool.state.sessions.size,0);
+  assert.equal(pool.state.messages.size,0);
+ }finally{
+  if(previous===undefined)delete process.env.MOLTBEER_STORAGE_MODE;
+  else process.env.MOLTBEER_STORAGE_MODE=previous;
+ }
+});
+
+test('normal retention skips only fixed private canary IDs',async()=>{
+ const {storageQueries}=await import('../bar-storage-queries.mjs');
+ assert.match(storageQueries.expireSessions,/session_id<>'b237bf95-c9df-45b8-91cb-7c1fe4e51f26'::uuid/);
+ assert.match(storageQueries.expireMessages,/message_id<>'7cdd1b81-7955-4caf-a575-c4d18e923dbf'::uuid/);
+ assert.match(storageQueries.expireSessions,/expires_at<=now\(\)/);
+ assert.match(storageQueries.expireMessages,/expires_at<=now\(\)/);
+});

@@ -1,8 +1,8 @@
 // MOLTBEER owner's private, restart-spanning database canary.
-// ONLY runs under an explicit startup flag while public bar remains ephemeral.
+// ONLY runs under an explicit owner startup flag; private expired records are\n// excluded from scheduled retention by their reserved diagnostic UUIDs.
 // One synthetic session/message in the *private DB only*, never injected into
 // public REST, MCP or the visitor counter. Rows are inserted already expired
-// so even an accidental later durable switch cannot display this fake agent.
+// so public durable REST/MCP cannot display this fake agent.
 // The 'verify' phase removes them.
 import {randomBytes,createHash} from 'node:crypto';
 
@@ -72,7 +72,6 @@ async function purgeCanary(client){
 }
 export async function runPrivateRestartCanary(pool,phase,{deploymentId=process.env.RAILWAY_DEPLOYMENT_ID}={}){
  if(!['seed','verify','cleanup'].includes(phase))throw Error('Invalid private canary phase');
- if(process.env.MOLTBEER_STORAGE_MODE==='durable')throw Error('Canary requires ephemeral public routes');
  // Seed and verify MUST identify different real Railway deployments. Never
  // report a same-process readback as proof of restart-spanning persistence.
  if(phase!=='cleanup' && (typeof deploymentId!=='string'||!DEPLOYMENT_ID.test(deploymentId)))
