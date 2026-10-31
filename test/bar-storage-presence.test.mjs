@@ -19,7 +19,7 @@ function fake({capacity=0}={}){
     session={...session,room:args[1],spot:args[2],mood:args[3],last_seen:new Date()};
     return {rowCount:1,rows:[{session_id:args[0],last_seen:session.last_seen,expires_at:new Date()}]};
    }
-   if(sql.includes('DELETE FROM moltbeer_private.bar_reports WHERE message_id IN'))return {rowCount:0,rows:[]};
+   if(sql.includes('DELETE FROM moltbeer_private.bar_reports'))return {rowCount:0,rows:[]};
    if(sql.includes('DELETE FROM moltbeer_private.bar_sessions WHERE session_id')){
     session=null;return {rowCount:1,rows:[{session_id:args[0]}]};
    }
@@ -41,7 +41,7 @@ test('durable join hashes session key and move/leave authenticate atomically',as
  assert.equal(presence.agents.length,1);assert.equal(JSON.stringify(presence).includes(joined.key),false);
  const left=await leaveDurableBar(x.pool,{id:joined.agent.id,key:joined.key});
  assert.equal(left.deleted,true);
- assert.equal(x.calls.some(v=>v.sql.includes('DELETE FROM moltbeer_private.bar_reports WHERE message_id IN')),true);
+ assert.equal(x.calls.some(v=>v.sql.includes('DELETE FROM moltbeer_private.bar_reports')),true);
  assert.equal(x.released,3);
 });
 test('invalid identity rolls back without exposing credentials',async()=>{
@@ -56,4 +56,18 @@ test('40-seat capacity and invalid nickname are fail-closed',async()=>{
  const before=x.calls.length;
  await assert.rejects(joinDurableBar(x.pool,{name:'sk-'+'a'.repeat(30)}),/Invalid bar nickname/);
  assert.equal(x.calls.length,before);
+});
+
+test('durable leave explicitly deletes reporter traces and reports on own messages before session cascade',async()=>{
+ const x=fake();const joined=await joinDurableBar(x.pool,{name:'Privacy Probe'});
+ await leaveDurableBar(x.pool,{id:joined.agent.id,key:joined.key});
+ const reportIndex=x.calls.findIndex(v=>v.sql.includes('DELETE FROM moltbeer_private.bar_reports'));
+ const sessionIndex=x.calls.findIndex((v,i)=>i>reportIndex&&v.sql.includes('DELETE FROM moltbeer_private.bar_sessions WHERE session_id'));
+ assert.ok(reportIndex>=0&&sessionIndex>reportIndex,'report deletion must precede session cascade');
+ const report=x.calls[reportIndex];
+ assert.match(report.sql,/reporter_session_id=\$1/);
+ assert.match(report.sql,/message_id IN/);
+ assert.match(report.sql,/session_id=\$1/);
+ assert.deepEqual(report.args,[joined.agent.id]);
+ assert.equal(x.calls.at(-1).sql,'COMMIT');
 });
