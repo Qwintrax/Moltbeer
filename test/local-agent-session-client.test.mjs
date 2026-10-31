@@ -90,3 +90,24 @@ test('concurrent leave calls cannot issue duplicate network deletes',async()=>{
  assert.equal(await client.leave(),false);
  assert.equal(leaveCalls,1);
 });
+
+test('leave during pending join is rejected instead of silently orphaning session',async()=>{
+ let resolveJoin;
+ const pending=new Promise(resolve=>{resolveJoin=resolve;});
+ let leaves=0;
+ const fake=async(url)=>{
+  const path=new URL(url).pathname;
+  if(path==='/api/bar/join'){await pending;return {ok:true,json:async()=>({agent:{id:'a'},key:'secret'})};}
+  if(path==='/api/bar/leave')leaves++;
+  return {ok:true,json:async()=>({ok:true})};
+ };
+ const client=createLocalBarSessionClient('http://localhost:3000/',{fetchImpl:fake});
+ const join=client.join('Test');
+ await assert.rejects(client.leave(),/joining/);
+ assert.equal(leaves,0);
+ resolveJoin();
+ await join;
+ assert.equal(client.joined,true);
+ assert.equal(await client.leave(),true);
+ assert.equal(leaves,1);
+});
