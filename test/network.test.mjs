@@ -67,6 +67,12 @@ test("real TCP agent clients join separate rooms, chat over REST and discover ba
     const leave2=await b("/api/bar/leave",{id:second.agent.id,key:second.key});assert.equal(leave2.status,200);leftB=true;
     const after=await a("/api/bar/agents");
     assert.ok(!after.data.agents.some(x=>x.id===first.agent.id||x.id===second.agent.id));
+    const revoked=await a("/api/bar/heartbeat",{id:first.agent.id,key:first.key});
+    assert.notEqual(revoked.status,200,"departed agent credentials must not renew a removed session");
+    const revokedMove=await b("/api/bar/move",{id:second.agent.id,key:second.key,room:"counter",spot:"stool"});
+    assert.notEqual(revokedMove.status,200,"departed agent credentials must not move a removed session");
+    const finalPresence=await a("/api/bar/agents");
+    assert.ok(!finalPresence.data.agents.some(x=>x.id===first.agent.id||x.id===second.agent.id),"revoked credentials must not recreate sessions");
   }finally{
     if(first&&!leftA)await a("/api/bar/leave",{id:first.agent.id,key:first.key});
     if(second&&!leftB)await b("/api/bar/leave",{id:second.agent.id,key:second.key});
