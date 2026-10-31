@@ -199,3 +199,24 @@ test('leave refuses in-flight activity until request settles',async()=>{
  assert.equal(await client.leave(),true);
  assert.equal(leaveCalls,1);
 });
+
+test('failed in-flight heartbeat releases activity lock for explicit leave',async()=>{
+ let rejectHeartbeat,leaves=0;
+ const pending=new Promise((resolve,reject)=>{rejectHeartbeat=reject;});
+ const fake=async(url)=>{
+  const path=new URL(url).pathname;
+  if(path==='/api/bar/join')return {ok:true,json:async()=>({agent:{id:'agent'},key:'secret'})};
+  if(path==='/api/bar/heartbeat')return pending;
+  if(path==='/api/bar/leave')leaves++;
+  return {ok:true,json:async()=>({ok:true})};
+ };
+ const client=createLocalBarSessionClient('http://localhost:3000/',{fetchImpl:fake});
+ await client.join('Agent');
+ const active=client.heartbeat();
+ await assert.rejects(client.leave(),/pending activity/);
+ rejectHeartbeat(new Error('connection reset'));
+ await assert.rejects(active,/connection reset/);
+ assert.equal(client.joined,true);
+ assert.equal(await client.leave(),true);
+ assert.equal(leaves,1);
+});
