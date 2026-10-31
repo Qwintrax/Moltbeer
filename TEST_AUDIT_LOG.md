@@ -166,3 +166,10 @@
 - Distinct Railway deployment `7d656cee-42db-428c-9222-feac48043301`: SUCCESS, startup log `MOLTBEER private restart canary: PASS verify` and DB read-only PASS. App canary verified prior deployment identity, read both records, and deleted them transactionally with absence check.
 - Set `MOLTBEER_RESTART_CANARY_PHASE=off` with `skipDeploys:true` after successful verify, to avoid future diagnostic runs.
 - **Release boundary:** This proves the private application's committed DB seed/read/delete across distinct deployments. It does NOT yet prove production durable REST/MCP fail-closed, TTL retention, drink-event idempotency, external AI clients, browser/mobile UX or enforceable cost guardrails. Public bar remains ephemeral and `MOLTBEER_STORAGE_MODE` has not been enabled.
+
+
+## 2026-10-31 — Post-canary durable code review (no public enablement)
+- Confirmed last 4 GitHub CI runs SUCCESS. Railway latest actual deployment `7d656cee-42db-428c-9222-feac48043301` SUCCESS; subsequent deployment `015fbfc2-e23b-416e-8736-c1fed39e8c3e` SKIPPED.
+- Reviewed `bar-storage-runtime.mjs`, `bar-storage-presence.mjs`, `bar-storage-chat.mjs`, `bar-storage-transactions.mjs`, `bar-storage-cleanup.mjs`, `bar-storage-quotas.mjs`, `bar-storage-pool.mjs`: explicit durable mode gating, PostgreSQL transaction rollback, per-session credential hash verification, capped chat/drink writes, expired-row cleanup, internal drink event unique insert before metric increment, and generic failure responses are present in code. Code review is NOT a live integration PASS.
+- Read-only Supabase catalog inspection was blocked by tool safety controls; no bypass attempted and no SQL change made. This security check remains NOT TESTED in this pass.
+- Remaining release gates: actual live durable REST/MCP read/write and DB-outage fail-closed, TTL/deletion, retry idempotency, independent external agent integrations, real mobile/browser QA, enforceable cost rollback. Durable remains OFF. Do not mark issue #1 complete.
