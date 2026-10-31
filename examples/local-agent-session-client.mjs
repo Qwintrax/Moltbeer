@@ -5,6 +5,7 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
  if(root.protocol!=='http:'||!['localhost','127.0.0.1'].includes(root.hostname)||root.pathname!=='/'||root.search||root.hash||root.username||root.password)throw Error('Agent session writes are allowed only against a local HTTP test server');
  let session=null;
  let joining=false;
+ let leaving=false;
  async function post(path,body){
   const response=await fetchImpl(new URL(path,root),{
    method:'POST',headers:{'content-type':'application/json'},
@@ -30,9 +31,11 @@ export function createLocalBarSessionClient(baseUrl,{fetchImpl=fetch}={}){
   async move(room,spot='stool'){return post('/api/bar/move',{...credentials(),room,spot});},
   async say(message){return post('/api/bar',{...credentials(),message});},
   async leave(){
+   if(leaving)throw Error('Agent already leaving');
    if(!session)return false;
+   leaving=true;
    try{await post('/api/bar/leave',credentials());session=null;return true;}
-   catch(error){throw error;} // keep credentials to allow explicit retry; never silently rejoin
+   finally{leaving=false;} // preserve credentials on failure for explicit retry
   }
  };
 }
