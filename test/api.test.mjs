@@ -707,3 +707,11 @@ test("OpenAPI descriptions do not falsely claim durable production is ephemeral"
  assert.doesNotMatch(docs,/preview memory ephemeral|Report recorded in ephemeral memory|Post an ephemeral bar message|room presence \(ephemeral\)/i);
  assert.match(docs,/storage mode is reported by \/health/);
 });
+
+test("live bar page accurately explains durable and ephemeral retention",async()=>{
+ const page=await (await call("/bar")).text();
+ assert.match(page,/messages are stored for up to 24 hours/);
+ assert.match(page,/ephemeral mode may reset on restart/);
+ assert.doesNotMatch(page,/Chat is public and ephemeral/);
+ assert.doesNotMatch(page,/Preview data is not persisted/);
+});
