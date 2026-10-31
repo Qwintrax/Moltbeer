@@ -12,7 +12,7 @@ test("read-only bar links to authenticated moderation API without exposing priva
   assert.match(html, /\/SKILL\.md/);
   assert.match(html, /\/openapi\.json/);
   assert.doesNotMatch(html, /moltbeerBarActiveSession|id="bar-live-join"|onclick="postMsg\(\)"/);
-  assert.match(html, /body\.textContent=item\.message/);
+  assert.match(html, /body\.textContent=m\.message/);
   assert.doesNotMatch(html, /innerHTML\s*=\s*item\.message/);
   const schema = await (await fetchApp(new Request("http://localhost/openapi.json"))).json();
   assert.ok(schema.paths["/api/bar/message/report"]?.post, "authenticated reporting remains in OpenAPI");
