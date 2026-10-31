@@ -13,6 +13,18 @@ jobs:
       MOLTBEER_STORAGE_MODE: ephemeral
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject PR branches missing current main history
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor origin/main "$PR_HEAD_SHA"; then
+            echo 'PR branch is based on outdated main; rebase before merge.' >&2
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
