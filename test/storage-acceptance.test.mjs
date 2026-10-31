@@ -60,3 +60,23 @@ test('acceptance never persists a failed outer transaction and releases its clie
  assert.equal(released,1);
  assert.equal(queries.includes('COMMIT'),false);
 });
+
+
+test('acceptance refuses nested transaction starts before issuing a second savepoint',async()=>{
+ const sql=[];
+ const client={query:async statement=>{sql.push(statement);return {rowCount:0,rows:[]}}};
+ const lease=await rollbackOnlyPool(client).connect();
+ await lease.query('BEGIN');
+ await assert.rejects(lease.query('BEGIN'),/Concurrent transaction/);
+ assert.deepEqual(sql,['SAVEPOINT moltbeer_accept_1']);
+ await lease.query('ROLLBACK');
+ assert.deepEqual(sql.slice(-2),['ROLLBACK TO SAVEPOINT moltbeer_accept_1','RELEASE SAVEPOINT moltbeer_accept_1']);
+});
+
+test('acceptance refuses COMMIT or ROLLBACK without a matching savepoint',async()=>{
+ const sql=[];
+ const lease=await rollbackOnlyPool({query:async statement=>{sql.push(statement);return {rowCount:0,rows:[]}}}).connect();
+ await assert.rejects(lease.query('COMMIT'),/Missing acceptance savepoint/);
+ await assert.rejects(lease.query('ROLLBACK'),/Missing acceptance savepoint/);
+ assert.deepEqual(sql,[],'no SQL should reach the database for invalid transaction boundaries');
+});
