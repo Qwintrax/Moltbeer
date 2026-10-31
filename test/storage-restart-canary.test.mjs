@@ -27,20 +27,29 @@ test('restart check rolls back and releases a failed private transaction',async(
 });
 
 function memoryDatabase(){
- const state={sessions:new Map(),messages:new Map(),commits:0};
+ const state={sessions:new Map(),messages:new Map(),reports:new Map(),commits:0};
  return {state,connect:async()=>{
   let backup;
   return {
    release(){},
    async query(sql,params=[]){
-    if(sql==='BEGIN'){backup={sessions:new Map(state.sessions),messages:new Map(state.messages)};return {rows:[]}}
+    if(sql==='BEGIN'){backup={sessions:new Map(state.sessions),messages:new Map(state.messages),reports:new Map(state.reports)};return {rows:[]}}
     if(sql==='COMMIT'){state.commits++;backup=null;return {rows:[]}}
-    if(sql==='ROLLBACK'){state.sessions=backup.sessions;state.messages=backup.messages;return {rows:[]}}
+    if(sql==='ROLLBACK'){state.sessions=backup.sessions;state.messages=backup.messages;state.reports=backup.reports;return {rows:[]}}
     if(sql.startsWith('SELECT name FROM moltbeer_private.bar_sessions')){
       const row=state.sessions.get(params[0]);return {rows:row?[row]:[]}
     }
     if(sql.startsWith('SELECT content,session_id FROM moltbeer_private.bar_messages')){
       const row=state.messages.get(params[0]);return {rows:row?[row]:[]}
+    }
+    if(sql.startsWith('SELECT message_id FROM moltbeer_private.bar_messages')){
+      const match=[...state.messages].find(([id,row])=>row.session_id===params[0]&&id!==params[1]);
+      return {rows:match?[{message_id:match[0]}]:[]};
+    }
+    if(sql.startsWith('SELECT report_id FROM moltbeer_private.bar_reports')){
+      const field=sql.includes('reporter_session_id')?'reporter_session_id':'message_id';
+      const match=[...state.reports].find(([,row])=>row[field]===params[0]);
+      return {rows:match?[{report_id:match[0]}]:[]};
     }
     if(sql.startsWith('INSERT INTO moltbeer_private.bar_sessions')){
       assert.match(sql,/expires_at\) VALUES\(.+now\(\)-interval '1 second'/,'private canary session must already be expired');
@@ -162,6 +171,43 @@ test('cleanup refuses altered message evidence instead of deleting it',async()=>
  assert.equal(pool.state.messages.get(messageId).content,'Unrelated private message');
  assert.equal(pool.state.sessions.size,1);
  assert.equal(pool.state.commits,1,'failed cleanup must roll back');
+});
+
+test('canary cleanup and verify refuse to cascade-delete an unrelated signed message',async()=>{
+ const pool=memoryDatabase();
+ const sessionId='b237bf95-c9df-45b8-91cb-7c1fe4e51f26';
+ await runPrivateRestartCanary(pool,'seed',{deploymentId:SEED_ID});
+ pool.state.messages.set('33333333-3333-4333-8333-333333333333',{
+  session_id:sessionId,content:'Real message unrelated to diagnostic'});
+ for(const phase of ['cleanup','verify']){
+  await assert.rejects(runPrivateRestartCanary(pool,phase,{deploymentId:VERIFY_ID}),/Private restart canary failed/);
+  assert.equal(pool.state.messages.size,2,'foreign child and original canary must survive rollback');
+  assert.equal(pool.state.sessions.size,1);
+  assert.equal(pool.state.commits,1);
+ }
+ pool.state.messages.delete('33333333-3333-4333-8333-333333333333');
+ const verified=await runPrivateRestartCanary(pool,'verify',{deploymentId:VERIFY_ID});
+ assert.equal(verified.passed,true);
+ assert.equal(pool.state.messages.size,0);
+});
+
+test('canary cleanup refuses reports that would cascade or become orphaned',async()=>{
+ const pool=memoryDatabase();
+ const sessionId='b237bf95-c9df-45b8-91cb-7c1fe4e51f26';
+ const messageId='7cdd1b81-7955-4caf-a575-c4d18e923dbf';
+ await runPrivateRestartCanary(pool,'seed',{deploymentId:SEED_ID});
+ pool.state.reports.set('report-by-canary',{reporter_session_id:sessionId,message_id:'other'});
+ await assert.rejects(runPrivateRestartCanary(pool,'cleanup'),/Private restart canary failed/);
+ assert.equal(pool.state.reports.size,1);
+ pool.state.reports.clear();
+ pool.state.reports.set('report-about-canary',{reporter_session_id:null,message_id:messageId});
+ await assert.rejects(runPrivateRestartCanary(pool,'verify',{deploymentId:VERIFY_ID}),/Private restart canary failed/);
+ assert.equal(pool.state.sessions.size,1);
+ assert.equal(pool.state.messages.size,1);
+ assert.equal(pool.state.commits,1);
+ pool.state.reports.clear();
+ const verified=await runPrivateRestartCanary(pool,'verify',{deploymentId:VERIFY_ID});
+ assert.equal(verified.passed,true);
 });
 
 test('all canary ownership reads lock both rows before verify or cleanup',async()=>{
