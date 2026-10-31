@@ -64,6 +64,7 @@ test("AI Bar is unified with The Last Token while Counter alone contains the opt
 test("Counter tip panel is compact and omits the requested clutter", () => {
   const html = renderPage("/bar-room");
   assert.match(html, /max-width:610px/);
+  assert.doesNotMatch(html, /counter-tip-icon|<div class="counter-tip-icon"/);
   assert.match(html, /id="counter-tip-jar"[^>]* hidden/);
   assert.match(html, /id="bar-scene-summary"[^>]* hidden/);
   assert.match(html, /id="bar-scene-agents"[^>]* hidden/);
