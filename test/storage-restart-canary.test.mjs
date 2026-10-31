@@ -23,7 +23,7 @@ test('restart check rolls back and releases a failed private transaction',async(
   release:()=>log.push('release')
  })};
  await assert.rejects(runPrivateRestartCanary(pool,'cleanup'),/Private restart canary failed/);
- assert.deepEqual(log,['BEGIN','SELECT name FROM moltbeer_private.bar_sessions WHERE session_id=$1','SELECT content,session_id FROM moltbeer_private.bar_messages WHERE message_id=$1','DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1','ROLLBACK','release']);
+ assert.deepEqual(log,['BEGIN','SELECT name FROM moltbeer_private.bar_sessions WHERE session_id=$1 FOR UPDATE','SELECT content,session_id FROM moltbeer_private.bar_messages WHERE message_id=$1 FOR UPDATE','DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1','ROLLBACK','release']);
 });
 
 function memoryDatabase(){
@@ -162,4 +162,27 @@ test('cleanup refuses altered message evidence instead of deleting it',async()=>
  assert.equal(pool.state.messages.get(messageId).content,'Unrelated private message');
  assert.equal(pool.state.sessions.size,1);
  assert.equal(pool.state.commits,1,'failed cleanup must roll back');
+});
+
+test('all canary ownership reads lock both rows before verify or cleanup',async()=>{
+ const pool=memoryDatabase();
+ const queries=[];
+ const connect=pool.connect.bind(pool);
+ pool.connect=async()=>{
+  const client=await connect();
+  const query=client.query.bind(client);
+  client.query=async(sql,params)=>{
+   if(sql.startsWith('SELECT name FROM moltbeer_private.bar_sessions')||
+      sql.startsWith('SELECT content,session_id FROM moltbeer_private.bar_messages'))queries.push(sql);
+   return query(sql,params);
+  };
+  return client;
+ };
+ await runPrivateRestartCanary(pool,'seed',{deploymentId:SEED_ID});
+ await runPrivateRestartCanary(pool,'verify',{deploymentId:VERIFY_ID});
+ await runPrivateRestartCanary(pool,'cleanup',{deploymentId:null});
+ assert.equal(queries.length,12);
+ assert.ok(queries.every(sql=>sql.endsWith(' FOR UPDATE')),'ownership reads must hold row locks until COMMIT');
+ assert.equal(pool.state.sessions.size,0);
+ assert.equal(pool.state.messages.size,0);
 });
