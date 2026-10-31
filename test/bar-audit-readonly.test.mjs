@@ -145,7 +145,7 @@ test('audit: invalid or malformed MCP messages reject requests without public mu
 test('audit: unconfigured owner moderation fails closed and does not reveal reports',async()=>{
  const r=await request('/api/moderation/reports');
  // A CI environment without an owner secret must not expose moderation.
- if(!process.env.MOLTBEER_ADMIN_TOKEN){
+ if(!process.env.MOLTBEER_ADMIN_TOKEN || process.env.MOLTBEER_ADMIN_TOKEN.length<32 || process.env.MOLTBEER_ADMIN_TOKEN.length>256){
   assert.equal(r.status,503);
   assert.equal(r.data?.reports,undefined);
  }
@@ -158,7 +158,7 @@ test('audit: public CI probe does not manufacture expected moderation 503s',asyn
  // The 503/401 security contract is tested against the isolated in-process
  // application, never by repeatedly calling the live production endpoint.
  const local=await request('/api/moderation/reports');
- if(!process.env.MOLTBEER_ADMIN_TOKEN)assert.equal(local.status,503);
+ if(!process.env.MOLTBEER_ADMIN_TOKEN || process.env.MOLTBEER_ADMIN_TOKEN.length<32 || process.env.MOLTBEER_ADMIN_TOKEN.length>256)assert.equal(local.status,503);
  else assert.equal(local.status,401);
 });
 
