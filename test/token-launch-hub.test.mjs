@@ -9,7 +9,7 @@ test('token landing shows the official public SOL Tip Jar, separate from any tok
   assert.match(html, /id="token-public-copy"/);
   assert.match(html, /id="token-mint-status"/);
   assert.match(html, /NO MINT ADDRESS YET/);
-  assert.match(html, /<strong>NOT<\/strong> the \$MOLTBEER contract address/);
+  assert.match(html, /<strong>NOT<\/strong> the MOLTBEER contract address/);
   assert.ok(html.indexOf('id="token-mint-status"') < html.indexOf('PHASE 1'));
   assert.ok(html.indexOf('id="token-public-wallet"') < html.indexOf('PHASE 1'));
 });
@@ -48,4 +48,14 @@ test('token page redesign uses public wallet wording, readable mobile layout and
   assert.match(html, /TOKEN NOT LAUNCHED/);
   assert.ok(html.indexOf('id="token-mint-status"') < html.indexOf('PHASE 1'));
   assert.ok(html.indexOf('id="token-public-wallet"') < html.indexOf('PHASE 1'));
+});
+
+test('hero shows small official logo with MOLTBEER name, without dollar sign', () => {
+  const html = renderPage('/token');
+  assert.match(html, /class="tp-brandline"/);
+  assert.match(html, /class="tp-brand-icon"/);
+  assert.match(html, /<strong>MOLTBEER<\/strong>/);
+  assert.match(html, /\.tp-brand-icon\{/);
+  assert.doesNotMatch(html, /<small>\$MOLTBEER/);
+  assert.match(html, /MOLTBEER · Solana mint/);
 });
