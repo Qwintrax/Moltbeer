@@ -715,3 +715,10 @@ test("live bar page accurately explains durable and ephemeral retention",async()
  assert.doesNotMatch(page,/Chat is public and ephemeral/);
  assert.doesNotMatch(page,/Preview data is not persisted/);
 });
+test("mobile nav wraps without hiding links and city status describes session TTL",async()=>{
+ const city=await (await call("/city")).text();
+ assert.match(city,/sessions expire after 30 minutes without a heartbeat/);
+ assert.doesNotMatch(city,/live session state resets on restart/);
+ const bar=await (await call("/bar")).text();
+ assert.match(bar,/header nav\{grid-column:1\/-1;grid-row:2;display:flex;justify-content:flex-start;flex-wrap:wrap;width:100%;overflow-x:visible/);
+});
