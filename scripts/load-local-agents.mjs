@@ -15,16 +15,30 @@ const call=async(path,data,i=0)=>{
  const response=await fetchApp(new Request(base+path,{method:data?'POST':'GET',headers:data?{'content-type':'application/json','x-real-ip':ipFor(i)}:{},body:data?JSON.stringify(data):undefined}));
  return {status:response.status,body:await response.json()};
 };
-const started=performance.now();let checks=0;
+const realNow=Date.now;
+let virtualOffsetMs=0;
+const advanceRateWindow=()=>{virtualOffsetMs+=61_000;Date.now=()=>realNow()+virtualOffsetMs;};
+const started=performance.now();let checks=0,throttled=0,attemptedRounds=0;
+let testFailure;
 try{
  const joined=await Promise.all(Array.from({length:count},(_,i)=>call('/api/bar/join',{name:prefix+i,room:i%2?'lounge':'counter'},i)));
  for(const item of joined){assert.equal(item.status,201);assert.equal(item.body.ok,true);sessions.push({id:item.body.agent.id,key:item.body.key});checks++}
  for(let round=0;round<rounds;round++){
   const results=await Promise.all(sessions.map((s,i)=>call('/api/bar/move',{...s,room:(i+round)%2?'lounge':'counter',spot:'stool',mood:'happy'},i)));
-  for(const item of results){assert.equal(item.status,200);assert.equal(item.body.ok,true);checks++}
+  for(const item of results){
+   if(item.status===429){assert.match(item.body.error,/Rate limit reached/);throttled++;checks++;continue}
+   assert.equal(item.status,200);assert.equal(item.body.ok,true);checks++;
+  }
   const presence=await call('/api/bar/agents');assert.equal(presence.status,200);
   assert.equal(presence.body.agents.filter(a=>a.name.startsWith(prefix)).length,count);checks++;
+  attemptedRounds++;
+  if(throttled){
+   // Exercise the real throttle, then advance only this isolated process clock.
+   // Never wait 60 seconds or disable the production rate limiter.
+   advanceRateWindow();break;
+  }
  }
+ if(rounds>=26)assert.ok(throttled>0,'Long load run must exercise HTTP 429');
  // Chat, ownership and MCP are exercised on isolated ephemeral sessions.
  const poster=sessions[0],reporter=sessions[1]||sessions[0];
  const posted=await call('/api/bar',{...poster,message:'Local test cheers'},count+1);
@@ -63,11 +77,29 @@ try{
  assert.equal(freshMove.status,200);checks++;
  const denied=await call('/api/bar/move',{id:sessions[0].id,key:'invalid-key',room:'arcade'},0);
  assert.notEqual(denied.status,200);checks++;
+}catch(error){testFailure=error;
 }finally{
- for(const [i,s] of sessions.entries()){const r=await call('/api/bar/leave',s,i);assert.equal(r.status,200);checks++}
- const after=await call('/api/bar/agents');assert.equal(after.body.agents.filter(a=>a.name.startsWith(prefix)).length,0);checks++;
+ // A saturated client must still be able to clean up once its 60s window expires.
+ // Do not let cleanup assertions hide the original test failure.
+ advanceRateWindow();
+ let cleanupFailure;
+ try{
+  const errors=[];
+  for(const [i,s] of sessions.entries()){
+   const r=await call('/api/bar/leave',s,i);
+   if(r.status===200)checks++;else errors.push(`agent ${i}: HTTP ${r.status}`);
+  }
+  const after=await call('/api/bar/agents');
+  assert.equal(after.status,200);
+  assert.equal(after.body.agents.filter(a=>a.name.startsWith(prefix)).length,0);
+  checks++;
+  assert.deepEqual(errors,[],'All local agents must be removed after the quota window');
+ }catch(error){cleanupFailure=error;
+ }finally{Date.now=realNow;}
+ if(testFailure){if(cleanupFailure)console.error('Local load cleanup also failed:',cleanupFailure.message);throw testFailure;}
+ if(cleanupFailure)throw cleanupFailure;
 }
-console.log(JSON.stringify({ok:true,localOnly:true,agents:count,rounds,checks,durationMs:Math.round(performance.now()-started),remainingTestAgents:0}));
+console.log(JSON.stringify({ok:true,localOnly:true,agents:count,rounds,attemptedRounds,throttled,checks,durationMs:Math.round(performance.now()-started),remainingTestAgents:0}));
 
 
 
