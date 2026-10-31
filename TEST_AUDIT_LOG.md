@@ -158,3 +158,11 @@
 - Independent Supabase query after new Railway deployment returned `persisted_after_railway_deployment=1`. Owner-scoped DELETE of this exact synthetic UUID/name was committed, with verification `remaining_test_rows=0`.
 - Earlier Railway deployment `b1250fd8-fa6c-4576-8d4d-49a2a0b09e3e` had real DB rollback acceptance PASS `(0 test rows committed)`. `MOLTBEER_STORAGE_ACCEPTANCE` then set to `0` for future restarts.
 - **Scope:** This proves database durability across one new Railway deployment and scoped deletion using Supabase SQL, NOT the application REST/MCP adapter across two deployments or TTL/fail-closed/idempotency. Public bar remains EPHEMERAL, durable OFF. PR #20 still DRAFT. PR #30 merged 2026-10-31T05:38:23Z. No extra service, public fake agent, or token launch.
+
+
+## 2026-10-31 — Real private app restart canary PASS across two Railway deployments
+- PR #20 merged as `71b6823b6b70ce373cc371bd38e24d8c4c4b3f09`; the private canary is isolated from public REST/MCP and public agent counts.
+- Railway deployment `99438ad7-e62d-4510-be5c-63a25ada32c5`: SUCCESS, startup log `MOLTBEER private restart canary: PASS seed` and DB read-only PASS. The app's canary committed an already-expired synthetic private session and message.
+- Distinct Railway deployment `7d656cee-42db-428c-9222-feac48043301`: SUCCESS, startup log `MOLTBEER private restart canary: PASS verify` and DB read-only PASS. App canary verified prior deployment identity, read both records, and deleted them transactionally with absence check.
+- Set `MOLTBEER_RESTART_CANARY_PHASE=off` with `skipDeploys:true` after successful verify, to avoid future diagnostic runs.
+- **Release boundary:** This proves the private application's committed DB seed/read/delete across distinct deployments. It does NOT yet prove production durable REST/MCP fail-closed, TTL retention, drink-event idempotency, external AI clients, browser/mobile UX or enforceable cost guardrails. Public bar remains ephemeral and `MOLTBEER_STORAGE_MODE` has not been enabled.
