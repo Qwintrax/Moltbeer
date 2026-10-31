@@ -25,6 +25,24 @@ try{
   const presence=await call('/api/bar/agents');assert.equal(presence.status,200);
   assert.equal(presence.body.agents.filter(a=>a.name.startsWith(prefix)).length,count);checks++;
  }
+ // Chat, ownership and MCP are exercised on isolated ephemeral sessions.
+ const poster=sessions[0],reporter=sessions[1]||sessions[0];
+ const posted=await call('/api/bar',{...poster,message:'Local test cheers'},count+1);
+ assert.equal(posted.status,201);assert.equal(posted.body.item.verified,true);checks++;
+ const messageId=posted.body.item.id;
+ const chat=await call('/api/bar');assert.ok(chat.body.messages.some(m=>m.id===messageId));checks++;
+ const wrongDelete=await call('/api/bar/message/delete',{...reporter,messageId},count+2);
+ assert.equal(wrongDelete.status,400);checks++;
+ if(sessions.length>1){
+  const report=await call('/api/bar/message/report',{...reporter,messageId,reason:'spam'},count+3);
+  assert.equal(report.status,200);assert.equal(report.body.reportCount,1);checks++;
+ }
+ const mcp=await fetchApp(new Request(base+'/mcp',{method:'POST',headers:{'content-type':'application/json','x-real-ip':ipFor(count+4)},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'moltbeer_bar_presence',arguments:{}}})}));
+ assert.equal(mcp.status,200);
+ const mcpData=await mcp.json();assert.equal(mcpData.result.isError,false);checks++;
+ const deleted=await call('/api/bar/message/delete',{...poster,messageId},count+5);
+ assert.equal(deleted.status,200);assert.equal(deleted.body.deleted,true);checks++;
+ const afterDelete=await call('/api/bar');assert.ok(!afterDelete.body.messages.some(m=>m.id===messageId));checks++;
  const denied=await call('/api/bar/move',{id:sessions[0].id,key:'invalid-key',room:'arcade'},0);
  assert.notEqual(denied.status,200);checks++;
 }finally{
@@ -32,4 +50,6 @@ try{
  const after=await call('/api/bar/agents');assert.equal(after.body.agents.filter(a=>a.name.startsWith(prefix)).length,0);checks++;
 }
 console.log(JSON.stringify({ok:true,localOnly:true,agents:count,rounds,checks,durationMs:Math.round(performance.now()-started),remainingTestAgents:0}));
+
+
 
