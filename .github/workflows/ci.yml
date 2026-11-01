@@ -45,6 +45,10 @@ jobs:
           node-version: '22'
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm test
+      - name: Verify disposable PostgreSQL dump and restore
+        env:
+          CI_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: bash scripts/ci-postgres-backup-restore.sh
       - name: Production dependency vulnerability audit (non-blocking)
         if: github.event_name == 'push'
         continue-on-error: true
