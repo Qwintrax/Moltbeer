@@ -39,3 +39,6 @@ jobs:
       - name: Verify production REST and MCP read-only audit
         timeout-minutes: 3
         run: node scripts/audit-remote-readonly.mjs
+      - name: Recheck exact live commit after all read-only checks
+        timeout-minutes: 1
+        run: node scripts/wait-for-deploy.mjs --once
