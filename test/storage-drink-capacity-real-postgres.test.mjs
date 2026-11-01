@@ -30,6 +30,14 @@ test('real PostgreSQL enforces drink cap and preserves idempotency at the limit'
   assert.equal(count.rows[0].n,20000,'no over-cap insert');
   const metric=await pool.query("SELECT total FROM moltbeer_private.bar_metrics WHERE metric='drinks_served_since_storage_enabled'");
   assert.equal(Number(metric.rows[0].total),1,'only new drink increments metric');
+  // Rolling 24h limit: historical events stay stored but do not occupy slots.
+  await pool.query("UPDATE moltbeer_private.drink_events SET served_at=now()-interval '25 hours' WHERE event_id=$1",[eventId]);
+  const fresh=await recordDrinkExactlyOnce(pool,{eventId:randomUUID(),slug:'moltbeer',source:'mcp'});
+  assert.equal(fresh.recorded,true,'old drink no longer consumes a 24h slot');
+  const active=await pool.query("SELECT count(*)::int AS n FROM moltbeer_private.drink_events WHERE served_at>now()-interval '24 hours'");
+  assert.equal(active.rows[0].n,20000,'rolling-window cap maintained');
+  const total=await pool.query("SELECT total FROM moltbeer_private.bar_metrics WHERE metric='drinks_served_since_storage_enabled'");
+  assert.equal(Number(total.rows[0].total),2,'historical drink still counted in cumulative metric');
   // Test the separate chat capacity threshold inside a real transaction.
   await pool.query('CREATE TABLE moltbeer_private.bar_messages (id integer PRIMARY KEY, expires_at timestamptz NOT NULL)');
   await pool.query("INSERT INTO moltbeer_private.bar_messages(id,expires_at) SELECT i,now()+interval '1 hour' FROM generate_series(1,2999) AS i");
