@@ -100,7 +100,7 @@ export async function reportDurableMessage(pool,{id,key,messageId,reason='spam'}
   const msg=await c.query('SELECT session_id FROM moltbeer_private.bar_messages WHERE message_id=$1 AND expires_at>now() FOR UPDATE',[messageId]);
   if(!msg.rowCount)bad('Message not found or expired');
   if(msg.rows[0].session_id===reporter.session_id)bad('You cannot report your own message');
-  const found=await c.query('SELECT 1 FROM moltbeer_private.bar_reports WHERE message_id=$1 AND reporter_session_id=$2 AND resolved_at IS NULL',[messageId,id]);
+  const found=await c.query('SELECT 1 FROM moltbeer_private.bar_reports WHERE message_id=$1 AND reporter_session_id=$2 AND resolved_at IS NULL AND expires_at>now()',[messageId,id]);
   if(found.rowCount)bad('This session already reported that message');
   await c.query('INSERT INTO moltbeer_private.bar_reports(report_id,message_id,reason,reporter_session_id) VALUES ($1,$2,$3,$4)',[randomUUID(),messageId,reason,id]);
   const count=await c.query('SELECT count(*)::int AS n FROM moltbeer_private.bar_reports WHERE message_id=$1 AND resolved_at IS NULL AND expires_at>now()',[messageId]);
