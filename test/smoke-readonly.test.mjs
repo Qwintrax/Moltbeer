@@ -46,3 +46,21 @@ test("all production smoke routes remain available locally", async () => {
     }
   }
 });
+
+test("owner moderation remains private without a valid bearer token", async () => {
+  const original = process.env.MOLTBEER_ADMIN_TOKEN;
+  process.env.MOLTBEER_ADMIN_TOKEN = "ci_only_moderation_token_12345678901234567890";
+  try {
+    for (const headers of [{}, {authorization: "Bearer invalid-release-smoke-credential"}]) {
+      const response = await fetchApp(new Request("http://localhost/api/moderation/reports", {headers}));
+      assert.equal(response.status, 401);
+      assert.equal(response.headers.get("www-authenticate"), "Bearer");
+      const result = await response.json();
+      assert.equal(result.error, "Unauthorized");
+      assert.equal(Object.hasOwn(result, "reports"), false);
+    }
+  } finally {
+    if (original === undefined) delete process.env.MOLTBEER_ADMIN_TOKEN;
+    else process.env.MOLTBEER_ADMIN_TOKEN = original;
+  }
+});

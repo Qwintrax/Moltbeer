@@ -71,6 +71,30 @@ if (!raw) {
       console.error("FAIL", path, error.message);
     }
   }
-  console.log(checks.length - failed + "/" + checks.length + " read-only endpoints passed");
+  // Safe negative authentication checks: GET only, no admin token and no writes.
+  // A missing production admin secret is also a release failure (503, not 401).
+  const deniedChecks = [
+    ["moderation without authorization", {}],
+    ["moderation with invalid bearer", {authorization: "Bearer invalid-release-smoke-credential"}],
+  ];
+  for (const [label, headers] of deniedChecks) {
+    try {
+      const response = await fetch(new URL("/api/moderation/reports", origin), {
+        method: "GET", redirect: "error", signal: AbortSignal.timeout(10000),
+        headers: {"user-agent": "MoltbeerReadOnlySmoke/1.0", ...headers},
+      });
+      assert.equal(response.status, 401, label + " must be rejected");
+      assert.equal(response.headers.get("www-authenticate"), "Bearer");
+      const data = await response.json();
+      assert.equal(data.error, "Unauthorized");
+      assert.equal(Object.hasOwn(data, "reports"), false, "Private moderation data must not leak");
+      console.log("PASS", label);
+    } catch (error) {
+      failed++;
+      console.error("FAIL", label, error.message);
+    }
+  }
+  const total = checks.length + deniedChecks.length;
+  console.log(total - failed + "/" + total + " read-only and auth-denial checks passed");
   if (failed) process.exitCode = 1;
 }
