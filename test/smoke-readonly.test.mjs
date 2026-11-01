@@ -16,6 +16,10 @@ test("all production smoke routes remain available locally", async () => {
     ["/.well-known/agent.json", "application/json"],
     ["/SKILL.md", "text/"],
     ["/bar", "text/html"],
+    ["/bar-room", "text/html"],
+    ["/city", "text/html"],
+    ["/privacy", "text/html"],
+    ["/assets/kenney-tiny-town-selected.webp", "image/webp"],
     ["/favicon.ico", "image/webp"],
   ];
   for (const [path, type] of paths) {
@@ -23,6 +27,18 @@ test("all production smoke routes remain available locally", async () => {
     assert.equal(response.status, 200, path);
     assert.ok((response.headers.get("content-type") || "").includes(type), path);
     if (path === "/health") assert.equal((await response.json()).ok, true);
+    if (path === "/api/bar") {
+      const etag = response.headers.get("etag");
+      assert.ok(etag, "public bar must provide a cache validator");
+      const cached = await fetchApp(new Request("http://localhost" + path, {headers: {"if-none-match": etag}}));
+      assert.equal(cached.status, 304);
+      assert.equal(await cached.text(), "");
+    }
+    if (path === "/api/bar/agents") {
+      const data = await response.json();
+      assert.ok(Array.isArray(data.agents));
+      assert.ok(data.agents.every(agent => agent.key === undefined), "public presence must never expose private session keys");
+    }
     if (path === "/api/stats") {
       const stats = await response.json();
       assert.equal(stats.counterScope, "since_server_restart");
