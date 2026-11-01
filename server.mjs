@@ -308,11 +308,16 @@ export async function fetchApp(req){
   if(req.method==="GET" && p==="/assets/kenney-tiny-town-selected.webp")return new Response(readFileSync(new URL("./assets/kenney-tiny-town-selected.webp",import.meta.url)),{status:200,headers:{"content-type":"image/webp","cache-control":"public, max-age=31536000, immutable","x-content-type-options":"nosniff"}});
   if(req.method==="GET" && (p==="/logo.webp"||p==="/favicon.ico"))return new Response(Buffer.from(BRAND_LOGO_WEBP_BASE64,"base64"),{status:200,headers:{"content-type":"image/webp","cache-control":"public, max-age=86400"}});
   if(req.method==="GET" && (p==="/health"||p==="/api/health")){
+     // Public, non-secret deployment fingerprint. Never report unvalidated env content.
+     // A post-deploy smoke must match this SHA to the tested GitHub commit.
+     const gitCommit=process.env.RAILWAY_GIT_COMMIT_SHA;
+     const healthHeaders=typeof gitCommit==="string" && /^[a-f0-9]{40}$/i.test(gitCommit)
+       ? {"x-moltbeer-deployment-commit":gitCommit.toLowerCase()} : {};
      if(durableModeEnabled()){
-       try{await getDurablePool();return json({ok:true,service:"moltbeer",version:"0.4.0",persistence:"durable"})}
-       catch{return json({ok:false,service:"moltbeer",persistence:"unavailable"},503)}
+       try{await getDurablePool();return json({ok:true,service:"moltbeer",version:"0.4.0",persistence:"durable"},200,healthHeaders)}
+       catch{return json({ok:false,service:"moltbeer",persistence:"unavailable"},503,healthHeaders)}
      }
-     return json({ok:true,service:"moltbeer",version:"0.3.0",persistence:"ephemeral"});
+     return json({ok:true,service:"moltbeer",version:"0.3.0",persistence:"ephemeral"},200,healthHeaders);
    }
    // All durable bar actions fail closed. The existing ephemeral paths below
    // remain untouched unless the owner explicitly opts in after acceptance tests.
