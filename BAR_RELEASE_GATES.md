@@ -1,15 +1,16 @@
 # MOLTBEER — bar release verification
 
-**Updated 2026-10-31.** The **only canonical live TODO and release-gate status** is [GitHub issue #1](https://github.com/Qwintrax/Moltbeer/issues/1). This document is a safety checklist, not an independent second TODO or authorization for production changes.
+**Updated 2026-11-01.** The **only canonical live TODO and release-gate status** is [GitHub issue #1](https://github.com/Qwintrax/Moltbeer/issues/1). This document is a safety checklist, not an independent second TODO or authorization for production changes.
 
-## Verified current baseline
+## Verified current baseline (2026-11-01)
 
-- **Durable Supabase mode is already active in Railway production**. Startup confirms `MOLTBEER durable pool verified; REST/MCP bar enabled`; do **not** unset it based on older pre-activation instructions.
-- Latest verified main change: PR #77 merged as `57b1aee9`. The 2026-10-31 owner Windows test run passed **176/176**, and GitHub Actions run **41231165134** succeeded. These are code and local test results, not a fresh full production CRUD acceptance.
-- Latest observed Railway deployment `264d3fcd-4023-43e3-bb4b-f6245c8489f7` was SUCCESS and logged `MOLTBEER durable pool verified; REST/MCP bar enabled`. Production read-only checks passed **15/15**; a prior comprehensive HTTP/MCP audit passed **31/31**. A new full 31-check audit after PR #77 has not yet been recorded.
-- Local moderation acceptance (PR #76) covers authenticated report queue and dismissal, 401 without authorization, and no leaked session keys. Mocked durable moderation tests (PR #77) cover queue, dismiss, remove, and rollback. **Neither is production authorized moderation proof**.
-- Isolated real PostgreSQL REST/MCP write → read → delete, idempotency, moderation, database-outage fail-closed and local dump/restore passed (see [issue #1 test evidence](https://github.com/Qwintrax/Moltbeer/issues/1#issuecomment-6543816161)). This **does not** prove production public CRUD, production admin authentication or a production backup.
-- Private Supabase tables have RLS; production sessions default to **30 minutes**, chat and reports to **24 hours**. Verified database retention defaults do not alone prove every live expiry/moderation lifecycle.
+- **Canonical live status remains [GitHub issue #1](https://github.com/Qwintrax/Moltbeer/issues/1)**. This file records dated evidence, not permission for production mutations.
+- **Production durable mode is active.** Railway deployment `d47ea9c6-c65c-4997-ab41-b30289b7a691` for merged [PR #121](https://github.com/Qwintrax/Moltbeer/pull/121) is **SUCCESS**; healthcheck **1/1**, startup `MOLTBEER durable pool verified; REST/MCP bar enabled`. Railway build **226 passed, 0 failed, 5 skipped** (isolated PostgreSQL tests require CI service).
+- [GitHub Actions #541](https://github.com/Qwintrax/Moltbeer/actions/runs/41292343139) **231/231 passed, 0 failed, 0 skipped**. Real disposable PostgreSQL checks include concurrent drink idempotency, rollback on counter failure, free-tier drink cap at 20,000/24h, duplicate retry at cap, rolling-window expiry, chat cap at 3,000 active messages and expired-message exclusion. These are **CI-only**, not production public API CRUD acceptance.
+- CI-only `pg_dump` → `pg_restore` is verified with related rows, schema, PK, UNIQUE, FK and identity sequence. **A real production dump restored into a separate disposable database has NOT been verified.**
+- Historical read-only production smoke **15/15** and HTTP/MCP audit **31/31** passed on older deployments. They **have not been rerun in full against the latest deployment**. Recent Railway read-only telemetry sampled 13 successful HTTP 2xx, 0 4xx/5xx; a small sample, not full acceptance.
+- Moderation/retention are covered by local and mocked tests, but the complete **authorized live report → moderation → deletion** and 30m/24h/30d lifecycle remain unverified in production. Real public write/read/delete, restart persistence, outage behavior, and two independent consenting external AI clients also remain open.
+- Railway IaC remains a candidate; authenticated CLI migration preview, zero-diff plan and safe cutover are **not complete**. See [RAILWAY_IAC_MIGRATION.md](RAILWAY_IAC_MIGRATION.md).
 
 ## Open release gates (do not mark complete without evidence)
 
