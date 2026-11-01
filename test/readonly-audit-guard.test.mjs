@@ -33,3 +33,12 @@ test("production audit fails closed before any potentially mutating request", ()
     assert.throws(() => guard(path, options), /Production audit/);
   }
 });
+
+
+test("production audit rejects unknown GET routes, query variants and external URLs", () => {
+  for (const path of ["/api/bar/join", "/api/moderation/reports", "/health?x=1", "https://example.com/health", "//example.com/health", "/not-a-route"]) {
+    assert.throws(() => guard(path), /Production audit/);
+  }
+  assert.throws(() => guard("/health", {method: "GET", body: "unexpected"}), /Production audit/);
+  assert.doesNotThrow(() => guard("/api/bar", {method: "GET", headers: {"if-none-match": "etag"}}));
+});
