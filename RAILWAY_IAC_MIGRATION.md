@@ -11,6 +11,12 @@ Updated **2026-10-31** from the live Railway service configuration and [Railway'
 - **Supabase durable mode is live**, with startup log `MOLTBEER durable pool verified; REST/MCP bar enabled`. Independent read-only production REST/MCP tests have passed. These do **not** prove an isolated public production write/delete cycle or a production backup.
 - Last checked active Railway deployment `9e8d21fe-cbb9-4d7d-9ecb-9f7a434f83f1` was SUCCESS. Later candidate-only commit `9e18382e` was SKIPPED by Railway (no live runtime change).
 
+## Read-only production comparison — 2026-11-01 12:20 UTC
+
+The connected Railway service configuration was read without accessing secret values or staging changes. Current live source is `Qwintrax/Moltbeer` / `main`; builder `RAILPACK` (build environment `V3`), runtime `V2`, start `npm start`, health `/health`, `sleepApplication: true`, one replica in `sfo`, and the existing Railway-managed domain. The environment has **no staged or pending changes**. Seven live **variable names** are present, including `MOLTBEER_X402_TIPS_ENABLED`, which the IaC candidate already preserves. Their values were not read.
+
+**Important limitation:** The candidate still omits explicit source/domain/region/replica/autosleep/restart/watch-pattern ownership. This is a known migration risk, not a verified mismatch or a reason to change live settings. The new isolated test `test/railway-iac-preflight.test.mjs` verifies core commands and the seven preserved variable names, but **cannot** substitute for an authenticated `railway config migrate` and `railway config plan`. Do not apply or delete the legacy config based on a passing static test.
+
 ## Current source files and known differences
 
 - `railway.json` is still the existing Config as Code file. It specifies `MOLTBEER_STORAGE_MODE=ephemeral npm test` for the build, `npm start`, `/health`, 60-second health-check timeout, **autosleep**, **restart on failure (three retries)**, and **watch patterns**.
