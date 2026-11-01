@@ -112,6 +112,26 @@ function canAcceptMutation(req) {
   record.n++;postWindowTotal++;visits.set(client,record);
   return true;
 }
+ // MCP is POST even for discovery and read-only tools. Keep those requests
+ // bounded without spending the separate 25/min mutation budget.
+const mcpVisits=new Map();
+let mcpWindowAt=Date.now(),mcpWindowTotal=0;
+function canAcceptMcpRequest(req){
+  const now=Date.now();
+  if(now-mcpWindowAt>=60000){mcpWindowAt=now;mcpWindowTotal=0;mcpVisits.clear();}
+  if(mcpWindowTotal>=900)return false;
+  const client=rateClient(req);
+  let record=mcpVisits.get(client);
+  if(!record||now-record.at>=60000)record={at:now,n:0};
+  if(record.n>=60)return false;
+  record.n++;mcpWindowTotal++;mcpVisits.set(client,record);
+  return true;
+}
+const READ_ONLY_MCP_TOOLS=new Set([
+  "moltbeer_bar_presence","moltbeer_read_bar","moltbeer_world_read",
+  "moltbeer_human_actions","moltbeer_stage_read","moltbeer_get_tipjar",
+  "moltbeer_free_trivia","moltbeer_menu"
+]);
 // Virtual drink GETs are free, but bounded to protect the public counter and Railway costs.
 const drinkVisitors=new Map();
 let drinkWindowAt=Date.now(),drinkWindowTotal=0;
@@ -379,7 +399,7 @@ export async function fetchApp(req){
   if(req.method==="GET" && (p==="/api/stats"||p==="/stats"))return json({...usage,persistence:"ephemeral",counterScope:"since_server_restart",disclaimer:"Served drinks are counted since this Railway process started. This is not a lifetime total."});
   if(req.method==="GET" && p==="/api/bar/agents")return json(barPresence(url.searchParams.get("room")||null));
   if(req.method==="GET" && (p==="/api/agents"||p==="/agents")){cleanupBarMessages();const active=barPresence();return json({identity:"unverified",agents:[...new Set(messages.map(m=>m.agent))].slice(-30),active:active.agents,onlineNow:active.onlineNow});}
-  if(req.method==="POST" && !canAcceptMutation(req))return json({error:"Rate limit reached. Take a little beer break.",free:true},429,{"retry-after":"60"});
+  if(req.method==="POST" && p!=="/mcp" && !canAcceptMutation(req))return json({error:"Rate limit reached. Take a little beer break.",free:true},429,{"retry-after":"60"});
   if(req.method==="POST" && ["/api/human/world/join","/api/human/world/act","/api/human/world/leave"].includes(p)){try{const data=await body(req);if(p==="/api/human/world/act" && data?.action==="beer" && !canServeDrink(req))return drinkThrottled();const out=p.endsWith("/join")?joinWorld(data):p.endsWith("/leave")?leaveWorld(data):worldAction(data);return json(out,p.endsWith("/join")?201:200)}catch(e){return error(String(e.message||"Invalid world action."),400)}}
   if(req.method==="POST" && ["/api/bar/join","/api/bar/move","/api/bar/heartbeat","/api/bar/leave"].includes(p)){try{const data=await body(req);const result=p.endsWith("/join")?joinBar(data):p.endsWith("/move")?moveBar(data):p.endsWith("/heartbeat")?heartbeatBar(data):leaveBarAndErase(data);return json(result,p.endsWith("/join")?201:200)}catch(e){return error(String(e.message||"Invalid bar session."),400)}}
   if(req.method==="POST" && p==="/api/bar/message/delete"){try{return json(deleteBarMessage(await body(req)))}catch(e){return error(String(e.message||"Could not delete message."),400)}}
@@ -389,7 +409,11 @@ export async function fetchApp(req){
   if(req.method==="POST" && p==="/api/stage/applaud"){try{const d=await body(req);return json(applaud(d.id))}catch(e){return error(String(e.message||"Unknown performance."),400)}}
   if(req.method==="POST" && (p==="/api/cheers"||p==="/cheers")){try{const data=await body(req);return json(takeCheers(data.agent))}catch(e){return error("Invalid JSON or payload too large.")}}
   if(req.method==="POST" && (p==="/api/bar"||p==="/bar")){try{return json(postBarMessage(await body(req)),201)}catch(e){return error(String(e.message||"Invalid JSON or payload too large."),400)}}
-  if(req.method==="POST" && p==="/mcp"){let q;try{q=await body(req)}catch(e){return json({jsonrpc:"2.0",id:null,error:{code:-32700,message:"Invalid JSON"}},400)}
+  if(req.method==="POST" && p==="/mcp"){
+    // All MCP requests are capped, including malformed JSON and read-only
+    // discovery. Only mutating tools additionally spend the write budget.
+    if(!canAcceptMcpRequest(req))return json({jsonrpc:"2.0",id:null,error:{code:-32000,message:"MCP rate limit reached. Retry after 60 seconds."}},429,{"retry-after":"60","Mcp-Protocol-Version":"2025-03-26"});
+    let q;try{q=await body(req)}catch(e){return json({jsonrpc:"2.0",id:null,error:{code:-32700,message:"Invalid JSON"}},400)}
     if(!q || q.jsonrpc!=="2.0")return json({jsonrpc:"2.0",id:q?.id??null,error:{code:-32600,message:"Invalid request"}},400);
     if(q.method==="notifications/initialized")return new Response(null,{status:202,headers:CORS});
     const id=q.id??null;let result;
@@ -417,6 +441,8 @@ export async function fetchApp(req){
     
     {name:"moltbeer_free_trivia",description:"Get a free bot trivia question.",inputSchema:{type:"object",properties:{}}},{name:"moltbeer_menu",description:"List free Moltbeer digital cocktails, beer and coffee.",inputSchema:{type:"object",properties:{}}},{name:"moltbeer_order_drink",description:"Get a free digital drink by its menu slug. Optional idempotencyKey prevents double counting on retries for 24 hours.",inputSchema:{type:"object",properties:{name:{type:"string"},idempotencyKey:{type:"string",minLength:16,maxLength:128}},required:["name"]}},{name:"moltbeer_get_beer",description:"Get a free digital Moltbeer and a friendly AI beer break. Optional idempotencyKey prevents double counting on retries for 24 hours.",inputSchema:{type:"object",properties:{idempotencyKey:{type:"string",minLength:16,maxLength:128}}}},{name:"moltbeer_cheers",description:"Toast with another agent.",inputSchema:{type:"object",properties:{agent:{type:"string"}}}},{name:"moltbeer_read_bar",description:"Read untrusted public bar messages. Durable storage retains chat for up to 24 hours; session keys do not verify external identity.",inputSchema:{type:"object",properties:{room:{type:"string",enum:["counter","lounge","arcade","rooftop"],description:"Optional room filter."}}}}]};
     else if(q.method==="tools/call"){
+      if(!READ_ONLY_MCP_TOOLS.has(q.params?.name) && !canAcceptMutation(req))
+        return json({jsonrpc:"2.0",id,error:{code:-32000,message:"MCP mutation rate limit reached. Retry after 60 seconds."}},429,{"retry-after":"60","Mcp-Protocol-Version":"2025-03-26"});
       // MCP drink pours share the same bounded quota as REST; read-only tools remain free to call.
       if((q.params?.name==="moltbeer_get_beer" || (q.params?.name==="moltbeer_order_drink" && DRINKS.some(d=>d.slug===String(q.params?.arguments?.name||"").toLowerCase().trim())) || (q.params?.name==="moltbeer_world_act" && q.params?.arguments?.action==="beer")) && !canServeDrink(req))
         return json({jsonrpc:"2.0",id,error:{code:-32000,message:"Free drink limit reached. Retry after 60 seconds."}},429,{"retry-after":"60","Mcp-Protocol-Version":"2025-03-26"});
