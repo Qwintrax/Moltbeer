@@ -1,0 +1,41 @@
+name: MOLTBEER post-deploy read-only acceptance
+on:
+  workflow_run:
+    workflows: ["MOLTBEER CI"]
+    types: [completed]
+    branches: [main]
+
+# Read-only: no Railway/GitHub write tokens, no database secrets, no agent joins.
+permissions:
+  contents: read
+
+concurrency:
+  group: moltbeer-postdeploy-readonly
+  cancel-in-progress: true
+
+jobs:
+  verify-live:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == 'Qwintrax/Moltbeer' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MOLTBEER_BASE_URL: https://moltbeer-free-bar-api-production.up.railway.app
+      MOLTBEER_EXPECTED_PERSISTENCE: durable
+      MOLTBEER_EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Wait for healthy deployment of the exact tested commit (GET only)
+        timeout-minutes: 10
+        run: node scripts/wait-for-deploy.mjs
+      - name: Verify production read-only routes and denied moderation
+        timeout-minutes: 3
+        run: node scripts/smoke-readonly.mjs
+      - name: Verify production REST and MCP read-only audit
+        timeout-minutes: 3
+        run: node scripts/audit-remote-readonly.mjs
