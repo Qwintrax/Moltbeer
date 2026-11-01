@@ -60,6 +60,23 @@ test('durable moderation remove deletes message and writes audit in same transac
  assert.equal(queries.at(-1).sql,'COMMIT');
 });
 
+test('durable moderation remove rolls back when target vanishes before deletion',async()=>{
+ const id=randomUUID(),queries=[];
+ const client={
+  query:async(sql)=>{
+   queries.push(sql);
+   if(sql.startsWith('SELECT report_id'))return {rowCount:1,rows:[{report_id:randomUUID()}]};
+   if(sql.startsWith('DELETE FROM moltbeer_private.bar_messages'))return {rowCount:0,rows:[]};
+   return {rowCount:1,rows:[]};
+  },release(){}
+ };
+ await assert.rejects(reviewDurableReport({connect:async()=>client},{messageId:id,action:'remove'}),/Durable transaction unavailable/);
+ assert.ok(queries.some(sql=>sql.includes('DELETE FROM moltbeer_private.bar_messages')&&sql.includes('expires_at>now() RETURNING message_id')));
+ assert.ok(queries.includes('ROLLBACK'));
+ assert.ok(!queries.includes('COMMIT'));
+ assert.ok(!queries.some(sql=>sql.startsWith('INSERT INTO moltbeer_private.bar_moderation_audit')));
+});
+
 test('durable moderation missing report fails closed and rolls back',async()=>{
  const id=randomUUID(),queries=[];
  const client={query:async(sql)=>{queries.push(sql);return {rowCount:0,rows:[]}},release(){}};
