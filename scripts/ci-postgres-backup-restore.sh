@@ -24,10 +24,10 @@ actual="$(pg psql -U moltbeer_ci -d moltbeer_backup_restore -At -v ON_ERROR_STOP
  -c "SELECT p.label || ':' || c.id FROM moltbeer_private.backup_probe p JOIN moltbeer_private.backup_child c ON c.probe_id=p.id WHERE p.id=1")"
 [[ "$actual" == "verified-ci-only:7" ]] || { echo "Isolated restore mismatch" >&2; exit 1; }
 # Restored schema must preserve FK constraints, unique indexes and identity sequence.
-constraint="$(pg psql -U moltbeer_ci -d moltbeer_backup_restore -At -v ON_ERROR_STOP=1 \\
+constraint="$(pg psql -U moltbeer_ci -d moltbeer_backup_restore -At -v ON_ERROR_STOP=1 \
  -c "SELECT count(*) FROM pg_constraint WHERE connamespace='moltbeer_private'::regnamespace AND contype IN ('p','u','f')")"
-[[ "$constraint" == "3" ]] || { echo "Restored constraints missing" >&2; exit 1; }
-next_id="$(pg psql -U moltbeer_ci -d moltbeer_backup_restore -At -v ON_ERROR_STOP=1 \\
+[[ "$constraint" == "4" ]] || { echo "Restored constraints missing" >&2; exit 1; }
+next_id="$(pg psql -U moltbeer_ci -d moltbeer_backup_restore -At -v ON_ERROR_STOP=1 \
  -c "INSERT INTO moltbeer_private.backup_probe(label) VALUES ('post-restore') RETURNING id")"
 [[ "$next_id" == "2" ]] || { echo "Restored identity sequence mismatch" >&2; exit 1; }
 echo 'PASS isolated PostgreSQL pg_dump -> pg_restore (rows, schema, FK, unique, identity; disposable CI only)'
