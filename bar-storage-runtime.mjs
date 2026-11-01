@@ -160,7 +160,12 @@ export async function reviewDurableReport(pool,{messageId,action}={}){
   const updated=await c.query(`UPDATE moltbeer_private.bar_reports SET resolution=$2,resolved_at=now()
    WHERE message_id=$1 AND resolved_at IS NULL AND expires_at>now()`,[messageId,action]);
   if(updated.rowCount!==r.rowCount)throw Error('Moderation update failed');
-  if(action==='remove')await c.query('DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1',[messageId]);
+  if(action==='remove'){
+   // A concurrent owner delete may remove the target after the report was
+   // selected. Never commit a successful removal audit if no row was removed.
+   const removed=await c.query('DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1 AND expires_at>now() RETURNING message_id',[messageId]);
+   if(removed.rowCount!==1)throw Error('Moderation removal failed');
+  }
   await c.query('INSERT INTO moltbeer_private.bar_moderation_audit(message_id,action) VALUES ($1,$2)',[messageId,action]);
   return {ok:true,free:true,action,notice:'Owner moderation action persisted.'};
  });
