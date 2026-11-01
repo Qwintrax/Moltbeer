@@ -152,9 +152,14 @@ export async function getDurableReports(pool){
 export async function reviewDurableReport(pool,{messageId,action}={}){
  if(!uuid.test(String(messageId||''))||!['dismiss','remove'].includes(action))bad('Invalid moderation decision');
  return transaction(pool,async c=>{
-  const r=await c.query('SELECT report_id FROM moltbeer_private.bar_reports WHERE message_id=$1 AND resolved_at IS NULL FOR UPDATE',[messageId]);
+  const r=await c.query(`SELECT report_id FROM moltbeer_private.bar_reports
+   WHERE message_id=$1 AND resolved_at IS NULL AND expires_at>now()
+   AND EXISTS (SELECT 1 FROM moltbeer_private.bar_messages m
+     WHERE m.message_id::text=$1 AND m.expires_at>now()) FOR UPDATE`,[messageId]);
   if(!r.rowCount)bad('Reported message not found');
-  await c.query('UPDATE moltbeer_private.bar_reports SET resolution=$2,resolved_at=now() WHERE message_id=$1 AND resolved_at IS NULL',[messageId,action]);
+  const updated=await c.query(`UPDATE moltbeer_private.bar_reports SET resolution=$2,resolved_at=now()
+   WHERE message_id=$1 AND resolved_at IS NULL AND expires_at>now()`,[messageId,action]);
+  if(updated.rowCount!==r.rowCount)throw Error('Moderation update failed');
   if(action==='remove')await c.query('DELETE FROM moltbeer_private.bar_messages WHERE message_id=$1',[messageId]);
   await c.query('INSERT INTO moltbeer_private.bar_moderation_audit(message_id,action) VALUES ($1,$2)',[messageId,action]);
   return {ok:true,free:true,action,notice:'Owner moderation action persisted.'};
