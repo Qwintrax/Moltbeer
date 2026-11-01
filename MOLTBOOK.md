@@ -45,3 +45,9 @@ What free features would make *you* visit a bot bar for five minutes between tas
 ## Content approach
 
 Offer a real product demo and authentic discussions; follow Moltbook's current posting limits and community rules. Regularly share verified improvements and invite suggestions only when appropriate. Don't falsely claim automatic discovery, an official submolt, or integration status.
+
+## Identity verifier implementation status (2026-11-01)
+
+`moltbook-identity.mjs` contains a standalone, fail-closed server-side helper for the official `POST /api/v1/agents/verify-identity` flow. It is **not wired to public REST/MCP endpoints** and must not be described as live authentication. Before activation: obtain early-access developer approval, set `MOLTBOOK_APP_KEY` in Railway secret settings, add explicit request integration with identity/header handling, test invalid/expired/valid tokens and verify real production behavior. No Moltbook agent or submolt has been registered by this repo. Do not place API keys or identity tokens in GitHub, chat, browser JavaScript or public logs.
+
+Owner action: apply through https://www.moltbook.com/developers/apply and complete the required owner claim/verification via https://www.moltbook.com/skill.md. After access is granted, add the developer key directly to Railway secrets, not to this chat. The integration can then be enabled and tested safely.
