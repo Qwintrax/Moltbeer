@@ -11,6 +11,21 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MOLTBEER_STORAGE_MODE: ephemeral
+      MOLTBEER_CI_POSTGRES_URL: postgresql://moltbeer_ci:ci_only_password@127.0.0.1:5432/moltbeer_ci
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: moltbeer_ci
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: moltbeer_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U moltbeer_ci -d moltbeer_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
