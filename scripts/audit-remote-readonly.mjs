@@ -3,6 +3,7 @@
 // cheers, chat, tipping, registration, fake agents or public writes.
 // Uses only GET plus metadata/presence MCP calls (which cannot create visitors).
 import assert from 'node:assert/strict';
+import {assertReadOnlyAuditRequest} from './readonly-audit-guard.mjs';
 const origin=process.env.MOLTBEER_BASE_URL;
 if(!origin)throw Error('MOLTBEER_BASE_URL must point to an approved HTTPS host');
 const root=new URL(origin);
@@ -31,6 +32,7 @@ const failures=[],durations=[];
 let health,menu,rooms,bar;
 const userAgent='MoltbeerFullReadOnlyAudit/1.0';
 async function http(path,options={}){
+ assertReadOnlyAuditRequest(path, options);
  const start=Date.now();
  const response=await fetch(new URL(path,root),{
   method:options.method||'GET',
