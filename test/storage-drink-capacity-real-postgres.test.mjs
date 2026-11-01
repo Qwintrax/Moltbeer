@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import pg from 'pg';
 import {randomUUID} from 'node:crypto';
 import {recordDrinkExactlyOnce} from '../bar-storage-transactions.mjs';
+import {assertDurableWriteCapacity} from '../bar-storage-quotas.mjs';
 
 test('real PostgreSQL enforces drink cap and preserves idempotency at the limit',async t=>{
  const url=process.env.MOLTBEER_CI_POSTGRES_URL;
@@ -29,6 +30,21 @@ test('real PostgreSQL enforces drink cap and preserves idempotency at the limit'
   assert.equal(count.rows[0].n,20000,'no over-cap insert');
   const metric=await pool.query("SELECT total FROM moltbeer_private.bar_metrics WHERE metric='drinks_served_since_storage_enabled'");
   assert.equal(Number(metric.rows[0].total),1,'only new drink increments metric');
+  // Test the separate chat capacity threshold inside a real transaction.
+  await pool.query('CREATE TABLE moltbeer_private.bar_messages (id integer PRIMARY KEY, expires_at timestamptz NOT NULL)');
+  await pool.query("INSERT INTO moltbeer_private.bar_messages(id,expires_at) SELECT i,now()+interval '1 hour' FROM generate_series(1,2999) AS i");
+  const client=await pool.connect();
+  try {
+   await client.query('BEGIN');
+   await assertDurableWriteCapacity(client,'chat');
+   await client.query("INSERT INTO moltbeer_private.bar_messages VALUES (3000,now()+interval '1 hour')");
+   await assert.rejects(assertDurableWriteCapacity(client,'chat'),e=>e?.code==='BAR_CAPACITY');
+   await client.query("UPDATE moltbeer_private.bar_messages SET expires_at=now()-interval '1 hour' WHERE id=1");
+   await assertDurableWriteCapacity(client,'chat');
+   await client.query('ROLLBACK');
+  } finally { client.release(); }
+  const chatCount=await pool.query('SELECT count(*)::int AS n FROM moltbeer_private.bar_messages');
+  assert.equal(chatCount.rows[0].n,2999,'test transaction rolled back');
  } finally {
   await pool.query('DROP SCHEMA IF EXISTS moltbeer_private CASCADE').catch(()=>{});
   await pool.end();
