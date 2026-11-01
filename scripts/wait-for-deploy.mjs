@@ -32,9 +32,9 @@ for (let attempt = 1; attempt <= attempts; attempt++) {
       console.log("PASS production health matches tested commit", expected);
       process.exit(0);
     }
-    console.log("WAIT production deployment has not reached tested commit (attempt", attempt, "of", attempts + ")"");
+    console.log("WAIT production deployment has not reached tested commit (attempt", attempt, "of", attempts + ")");
   } catch (error) {
-    console.log("WAIT production health unavailable (attempt", attempt, "of", attempts + ")":", error.name);
+    console.log("WAIT production health unavailable (attempt", attempt, "of", attempts + "):", error.name);
   }
   if (attempt < attempts) await delay(10000);
 }
