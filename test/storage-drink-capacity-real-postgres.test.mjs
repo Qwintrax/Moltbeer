@@ -32,12 +32,30 @@ test('real PostgreSQL enforces drink cap and preserves idempotency at the limit'
   assert.equal(Number(metric.rows[0].total),1,'only new drink increments metric');
   // Rolling 24h limit: historical events stay stored but do not occupy slots.
   await pool.query("UPDATE moltbeer_private.drink_events SET served_at=now()-interval '25 hours' WHERE event_id=$1",[eventId]);
-  const fresh=await recordDrinkExactlyOnce(pool,{eventId:randomUUID(),slug:'moltbeer',source:'mcp'});
+  const freshId=randomUUID();
+  const fresh=await recordDrinkExactlyOnce(pool,{eventId:freshId,slug:'moltbeer',source:'mcp'});
   assert.equal(fresh.recorded,true,'old drink no longer consumes a 24h slot');
   const active=await pool.query("SELECT count(*)::int AS n FROM moltbeer_private.drink_events WHERE served_at>now()-interval '24 hours'");
   assert.equal(active.rows[0].n,20000,'rolling-window cap maintained');
   const total=await pool.query("SELECT total FROM moltbeer_private.bar_metrics WHERE metric='drinks_served_since_storage_enabled'");
   assert.equal(Number(total.rows[0].total),2,'historical drink still counted in cumulative metric');
+  // Two concurrent unique events contend for exactly one freed 24h slot.
+  // PostgreSQL advisory transaction locking must admit only one, even with
+  // separate pooled connections. A rejected event must never increment stats.
+  await pool.query("UPDATE moltbeer_private.drink_events SET served_at=now()-interval '25 hours' WHERE event_id=$1",[freshId]);
+  const contenderIds=[randomUUID(),randomUUID()];
+  const outcomes=await Promise.allSettled(contenderIds.map(id=>recordDrinkExactlyOnce(pool,{eventId:id,slug:'moltbeer',source:'rest'})));
+  const successes=outcomes.filter(o=>o.status==='fulfilled'&&o.value.recorded===true);
+  const rejected=outcomes.filter(o=>o.status==='rejected'&&o.reason?.code==='BAR_CAPACITY');
+  assert.equal(successes.length,1,'exactly one concurrent request fills the last slot');
+  assert.equal(rejected.length,1,'other concurrent request is rejected at capacity');
+  const winnerIndex=outcomes.findIndex(o=>o.status==='fulfilled');
+  const retryWinner=await recordDrinkExactlyOnce(pool,{eventId:contenderIds[winnerIndex],slug:'moltbeer',source:'mcp'});
+  assert.equal(retryWinner.recorded,false,'winning event stays idempotent at capacity');
+  const finalActive=await pool.query("SELECT count(*)::int AS n FROM moltbeer_private.drink_events WHERE served_at>now()-interval '24 hours'");
+  assert.equal(finalActive.rows[0].n,20000,'concurrent writes cannot exceed rolling capacity');
+  const finalMetric=await pool.query("SELECT total FROM moltbeer_private.bar_metrics WHERE metric='drinks_served_since_storage_enabled'");
+  assert.equal(Number(finalMetric.rows[0].total),3,'only the accepted concurrent event increments cumulative metric');
   // Test the separate chat capacity threshold inside a real transaction.
   await pool.query('CREATE TABLE moltbeer_private.bar_messages (id integer PRIMARY KEY, expires_at timestamptz NOT NULL)');
   await pool.query("INSERT INTO moltbeer_private.bar_messages(id,expires_at) SELECT i,now()+interval '1 hour' FROM generate_series(1,2999) AS i");
