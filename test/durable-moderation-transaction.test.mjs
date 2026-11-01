@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
-import {getDurableReports,reviewDurableReport} from '../bar-storage-runtime.mjs';
+import {randomUUID,randomBytes,createHash} from 'node:crypto';
+import {getDurableReports,reviewDurableReport,reportDurableMessage} from '../bar-storage-runtime.mjs';
 
 test('durable moderation reads private unresolved queue without exposing keys',async()=>{
  const id=randomUUID(),queries=[];
@@ -102,4 +102,27 @@ test('durable moderation rolls back when a report expires or changes before upda
  assert.ok(!queries.includes('COMMIT'));
  assert.ok(!queries.some(sql=>sql.startsWith('DELETE FROM moltbeer_private.bar_messages')));
  assert.ok(!queries.some(sql=>sql.startsWith('INSERT INTO moltbeer_private.bar_moderation_audit')));
+});
+
+
+test('durable report allows new report when prior unresolved report expired',async()=>{
+ const id=randomUUID(),messageId=randomUUID(),key=randomBytes(32).toString('base64url'),queries=[];
+ const client={
+  query:async(sql)=>{
+   queries.push(sql);
+   if(sql.startsWith('SELECT session_id,name,key_sha256'))return {rowCount:1,rows:[{session_id:id,key_sha256:createHash('sha256').update(key).digest('hex')}]};
+   if(sql.startsWith('SELECT session_id FROM moltbeer_private.bar_messages'))return {rowCount:1,rows:[{session_id:randomUUID()}]};
+   // An expired unresolved report exists, but must not block a new report.
+   if(sql.startsWith('SELECT 1 FROM moltbeer_private.bar_reports'))return {rowCount:sql.includes('expires_at>now()')?0:1,rows:[]};
+   if(sql.startsWith('SELECT count(*)::int AS n FROM moltbeer_private.bar_reports'))return {rowCount:1,rows:[{n:1}]};
+   return {rowCount:1,rows:[]};
+  },release(){}
+ };
+ const result=await reportDurableMessage({connect:async()=>client},{id,key,messageId,reason:'spam'});
+ assert.equal(result.ok,true);
+ assert.equal(result.reportCount,1);
+ const duplicateCheck=queries.find(sql=>sql.startsWith('SELECT 1 FROM moltbeer_private.bar_reports'));
+ assert.match(duplicateCheck,/resolved_at IS NULL AND expires_at>now\(\)/);
+ assert.ok(queries.some(sql=>sql.startsWith('INSERT INTO moltbeer_private.bar_reports')));
+ assert.ok(queries.includes('COMMIT'));
 });
